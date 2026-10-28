@@ -1,10 +1,37 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestRunLogsOnlyErrors(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"git", "docker"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\necho command-output\nexit 1\n"), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", dir)
+	path := filepath.Join(dir, "update-items.json")
+	if err := os.WriteFile(path, []byte(`{"items":[{"repo":"repo","target":"project"}]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := run(context.Background(), path); err == nil {
+		t.Fatal("expected clone failure")
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "error.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 1 || !strings.Contains(lines[0], "ERROR: clone:") {
+		t.Fatalf("expected only the clone error in log, got %q", data)
+	}
+}
 
 func TestReadConfig(t *testing.T) {
 	for _, tc := range []struct {

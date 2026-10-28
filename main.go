@@ -198,13 +198,13 @@ func run(ctx context.Context, path string) error {
 		return fmt.Errorf("cannot acquire update lock (another updater may be running): %w", err)
 	}
 	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
-	file, err := os.OpenFile(filepath.Join(filepath.Dir(path), "update.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	file, err := os.OpenFile(filepath.Join(filepath.Dir(path), "error.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-	output := io.MultiWriter(os.Stdout, file)
-	logger := log.New(output, "", log.LstdFlags)
+	logger := log.New(os.Stdout, "", log.LstdFlags)
+	errorLogger := log.New(file, "", log.LstdFlags)
 	for _, name := range []string{"git", "docker"} {
 		if _, err := exec.LookPath(name); err != nil {
 			return err
@@ -217,8 +217,9 @@ func run(ctx context.Context, path string) error {
 		}
 		logger.SetPrefix("[" + entry.Target + "] ")
 		logger.Print("Checking project")
-		if err := update(ctx, entry, output, logger); err != nil {
-			logger.Printf("ERROR: %v", err)
+		if err := update(ctx, entry, os.Stdout, logger); err != nil {
+			errorLogger.SetPrefix("[" + entry.Target + "] ")
+			errorLogger.Printf("ERROR: %v", err)
 			failed = true
 		}
 	}
