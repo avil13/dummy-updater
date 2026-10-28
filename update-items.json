@@ -1,0 +1,8 @@
+{
+  "items": [
+    {
+      "repo": "git@github.com:YOUR_USER/fi-ends.git",
+      "target": "/home/master/git/fi-ends"
+    }
+  ]
+}
