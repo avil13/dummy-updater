@@ -49,6 +49,33 @@ func TestAddItem(t *testing.T) {
 	}
 }
 
+func TestAddItemDefaultRun(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	var output strings.Builder
+	if err := addItem(path, strings.NewReader("repo\nproject\n\n\n"), &output); err != nil {
+		t.Fatal(err)
+	}
+	c, err := readConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const want = "docker compose up -d --build --remove-orphans"
+	if c.Items[0].Run != want {
+		t.Fatalf("expected default run %q, got %q", want, c.Items[0].Run)
+	}
+	for _, text := range []string{"repository URL", "project directory", "run — command", "additional attempts", "Project added to " + path} {
+		if !strings.Contains(output.String(), text) {
+			t.Fatalf("missing English message %q in %q", text, output.String())
+		}
+	}
+	if strings.Contains(output.String(), "\x1b[") {
+		t.Fatal("redirected output must not contain ANSI colors")
+	}
+	if !strings.Contains(output.String(), "["+want+"]") {
+		t.Fatalf("default command missing from prompt: %q", output.String())
+	}
+}
+
 func TestAddItemDoesNotOverwriteOnError(t *testing.T) {
 	original := `{"items":[{"repo":"repo","target":"project","run":"true"}]}`
 	for _, tc := range []struct {
@@ -58,7 +85,7 @@ func TestAddItemDoesNotOverwriteOnError(t *testing.T) {
 		{"duplicate target", original, "other\n./project\ntrue\n\n", false},
 		{"missing repo", original, "\nnew\ntrue\n\n", false},
 		{"missing target", original, "repo\n\ntrue\n\n", false},
-		{"missing run", original, "repo\nnew\n\n\n", false},
+		{"blank run", original, "repo\nnew\n \t\n\n", false},
 		{"negative retry", original, "repo\nnew\ntrue\n-1\n", false},
 		{"invalid retry", original, "repo\nnew\ntrue\n1.5\n", false},
 		{"interrupted", original, "repo\nnew\n", false},

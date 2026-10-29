@@ -30,9 +30,15 @@ func addItem(path string, input io.Reader, output io.Writer) error {
 	if err != nil {
 		return err
 	}
+	cyan, green, reset := "", "", ""
+	if file, ok := output.(*os.File); ok && os.Getenv("NO_COLOR") == "" && os.Getenv("TERM") != "dumb" && os.Getenv("TERM") != "" {
+		if info, err := file.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
+			cyan, green, reset = "\033[36m", "\033[32m", "\033[0m"
+		}
+	}
 	reader := bufio.NewReader(input)
 	ask := func(prompt string) (string, error) {
-		if _, err := fmt.Fprint(output, prompt); err != nil {
+		if _, err := fmt.Fprint(output, cyan, prompt, reset); err != nil {
 			return "", err
 		}
 		line, err := reader.ReadString('\n')
@@ -41,21 +47,25 @@ func addItem(path string, input io.Reader, output io.Writer) error {
 		}
 		return strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r"), nil
 	}
+	const defaultRun = "docker compose up -d --build --remove-orphans"
 	var entry item
 	for _, field := range []struct {
 		prompt string
 		value  *string
 	}{
-		{"repo — URL репозитория: ", &entry.Repo},
-		{"target — директория проекта (относительно конфига): ", &entry.Target},
-		{"run — команда запуска: ", &entry.Run},
+		{"repo — repository URL: ", &entry.Repo},
+		{"target — project directory (relative to config): ", &entry.Target},
+		{"run — command [" + defaultRun + "]: ", &entry.Run},
 	} {
 		*field.value, err = ask(field.prompt)
 		if err != nil {
 			return err
 		}
 	}
-	retry, err := ask("retry — дополнительные попытки [2], 0 — без повторов: ")
+	if entry.Run == "" {
+		entry.Run = defaultRun
+	}
+	retry, err := ask("retry — additional attempts [2], 0 — no retries: ")
 	if err != nil {
 		return err
 	}
@@ -108,6 +118,6 @@ func addItem(path string, input io.Reader, output io.Writer) error {
 	if err := os.Rename(file.Name(), path); err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(output, "Проект добавлен в %s\n", path)
+	_, err = fmt.Fprintf(output, "%sProject added to %s%s\n", green, path, reset)
 	return err
 }
