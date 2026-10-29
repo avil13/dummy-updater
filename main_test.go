@@ -85,6 +85,23 @@ func TestUpdateRun(t *testing.T) {
 	}
 }
 
+func TestValidateConfigRepoWhitespace(t *testing.T) {
+	for _, repo := range []string{
+		` https://example.org/repo.git`,
+		`https://example.org/repo.git `,
+		`\thttps://example.org/repo.git`,
+		`https://example.org/repo.git\n`,
+	} {
+		t.Run(repo, func(t *testing.T) {
+			data := []byte(`{"items":[{"repo":"` + repo + `","target":"project","run":"true"}]}`)
+			_, err := validateConfig(data, filepath.Join(t.TempDir(), "update-items.json"))
+			if err == nil || err.Error() != "items[0].repo: leading or trailing whitespace is not allowed" {
+				t.Fatalf("expected repo whitespace validation error, got %v", err)
+			}
+		})
+	}
+}
+
 func TestReadConfig(t *testing.T) {
 	for _, tc := range []struct {
 		name, data string

@@ -31,11 +31,15 @@ type config struct {
 }
 
 func readConfig(path string) (config, error) {
-	var c config
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return c, err
+		return config{}, err
 	}
+	return validateConfig(data, path)
+}
+
+func validateConfig(data []byte, path string) (config, error) {
+	var c config
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&c); err != nil {
@@ -53,13 +57,17 @@ func readConfig(path string) (config, error) {
 		if strings.TrimSpace(entry.Repo) == "" || strings.TrimSpace(entry.Target) == "" || strings.TrimSpace(entry.Run) == "" {
 			return c, fmt.Errorf("items[%d]: repo, target and run are required", i)
 		}
+		if entry.Repo != strings.TrimSpace(entry.Repo) {
+			return c, fmt.Errorf("items[%d].repo: leading or trailing whitespace is not allowed", i)
+		}
 		if !filepath.IsAbs(entry.Target) {
 			entry.Target = filepath.Join(filepath.Dir(path), entry.Target)
 		}
-		entry.Target, err = filepath.Abs(entry.Target)
+		target, err := filepath.Abs(entry.Target)
 		if err != nil {
 			return c, err
 		}
+		entry.Target = target
 		if seen[entry.Target] {
 			return c, fmt.Errorf("duplicate target: %s", entry.Target)
 		}
