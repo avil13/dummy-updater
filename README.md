@@ -268,15 +268,26 @@ HTTP POST к Telegram Bot API `sendMessage` с токеном бота и ID к�
 для совместимости используются `TELEGRAM_ENABLED=true`, `TELEGRAM_BOT_TOKEN`,
 `TELEGRAM_CHAT_ID`; они также включают итоговый отчёт вместо отдельных уведомлений.
 
+## Структура исходников
+
+- `cmd/updater/main.go` — точка входа CLI.
+- `internal/updater/` — конфигурация, обновление проектов, команды CLI,
+  Telegram и логирование; тесты расположены рядом с кодом.
+- `cmd/updater/main_test.go` — проверка собранного CLI.
+
 ## Сборка и pre-commit
 
-Нужен Go 1.22+. В каждом новом клоне включите hook:
+Нужны Go 1.22+ и `golangci-lint` в `PATH`. В каждом новом клоне включите hook:
 
 ```sh
 git config core.hooksPath .githooks
 ```
 
-При коммите hook проверяет тесты и собирает **staged-версию** исходников:
+При коммите hook сначала выполняет `golangci-lint run --fix` в рабочем каталоге.
+Если Go-файлы изменились, коммит останавливается: проверьте исправления,
+добавьте нужные изменения в index и повторите коммит. Hook не добавляет
+исправленные исходники в index автоматически. Ошибки lint также блокируют коммит.
+Если исправлений нет, hook проверяет тесты и собирает **staged-версию** исходников:
 `dist/updater-{linux,darwin}-{amd64,arm64}`, затем добавляет все четыре
 бинарника в коммит. Перед первым коммитом добавьте исходники в index.
 Docker тестами и hook не запускается.
@@ -299,7 +310,7 @@ go vet ./...
 mkdir -p dist
 for os in linux darwin; do
   for arch in amd64 arm64; do
-    CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/updater-$os-$arch" .
+    CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "dist/updater-$os-$arch" ./cmd/updater
   done
 done
 ```

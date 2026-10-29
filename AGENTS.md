@@ -6,8 +6,8 @@
 
 ## Layout
 
-- `main.go`: config validation, Git updates, command retries, locking, error logging, Telegram notifications, and CLI entry point.
-- `main_test.go`: config, command execution/retry, and error logging tests.
+- `cmd/updater/main.go`: thin CLI entry point; CLI integration tests live beside it.
+- `internal/updater/`: config validation, Git updates, command retries, locking, logging, Telegram notifications, and CLI handling. Tests live beside the implementation.
 - `update.sh`: selects the platform binary and defaults to config beside the script.
 - `config.example.json`: sample configuration; keep real credentials out of the repository.
 - `README.md`: user documentation, written in Russian; preserve its language when editing.
@@ -16,7 +16,7 @@
 
 ## Working conventions
 
-- Make focused changes; preserve the small, single-package structure and prefer the standard library.
+- Make focused changes; keep application logic in the single `internal/updater` package with a thin `cmd/updater` entry point, and prefer the standard library.
 - Format changed Go files with `gofmt`.
 - Add focused regression tests for changed behavior. Use temporary directories and fake executables on `PATH`, following existing tests; do not require real Docker, remote repositories, or Telegram.
 - Update the README and example config when changing user-facing behavior or configuration.
@@ -44,4 +44,4 @@ For shell changes, check syntax with `bash -n update.sh .githooks/pre-commit`. T
 
 ## Build workflow
 
-Enable the commit hook in a new clone with `git config core.hooksPath .githooks` when requested. The hook tests the **staged** snapshot, builds all four binaries with CGO disabled, and stages them in `dist/`. Do not invoke it merely as a check: it modifies binaries and the index. See `README.md` for manual cross-build commands; avoid regenerating binaries for documentation-only changes.
+Enable the commit hook in a new clone with `git config core.hooksPath .githooks` when requested. The hook first runs `golangci-lint run --fix` on the working tree and aborts if Go files change, leaving fixes unstaged for review. It then tests the **staged** snapshot, builds all four binaries with CGO disabled, and stages them in `dist/`. Do not invoke it merely as a check: it modifies binaries and the index. See `README.md` for manual cross-build commands; avoid regenerating binaries for documentation-only changes.

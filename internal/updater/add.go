@@ -1,4 +1,4 @@
-package main
+package updater
 
 import (
 	"bufio"
@@ -20,7 +20,7 @@ func acquireConfigLock(path string) (*os.File, error) {
 		return nil, err
 	}
 	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		lock.Close()
+		_ = lock.Close()
 		return nil, fmt.Errorf("cannot acquire config lock (another updater may be running): %w", err)
 	}
 	return lock, nil
@@ -115,7 +115,7 @@ func addItem(path, directory string, input io.Reader, output io.Writer) error {
 	if err != nil {
 		return err
 	}
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	var c config
 	data, err := os.ReadFile(path)
 	if err == nil {
@@ -142,9 +142,9 @@ func addItem(path, directory string, input io.Reader, output io.Writer) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(file.Name())
+	defer func() { _ = os.Remove(file.Name()) }()
 	if _, err := file.Write(append(data, '\n')); err != nil {
-		file.Close()
+		_ = file.Close()
 		return err
 	}
 	if err := file.Close(); err != nil {

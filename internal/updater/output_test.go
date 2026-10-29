@@ -1,4 +1,4 @@
-package main
+package updater
 
 import (
 	"context"
@@ -48,7 +48,12 @@ func TestRunProjectTranscripts(t *testing.T) {
 			}
 			stdout, stderr := os.Stdout, os.Stderr
 			os.Stdout, os.Stderr = console, console
-			t.Cleanup(func() { os.Stdout, os.Stderr = stdout, stderr; console.Close() })
+			t.Cleanup(func() {
+				os.Stdout, os.Stderr = stdout, stderr
+				if err := console.Close(); err != nil {
+					t.Error(err)
+				}
+			})
 			if err := run(context.Background(), path); (err != nil) != fail {
 				t.Fatalf("run: %v", err)
 			}

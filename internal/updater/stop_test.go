@@ -1,4 +1,4 @@
-package main
+package updater
 
 import (
 	"bytes"
@@ -56,7 +56,11 @@ func TestStopItem(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer lock.Close()
+				defer func() {
+					if err := lock.Close(); err != nil {
+						t.Error(err)
+					}
+				}()
 			}
 			var output bytes.Buffer
 			err := stopItem(ctx, path, strings.NewReader(tc.input), &output)

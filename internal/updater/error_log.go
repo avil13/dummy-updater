@@ -1,4 +1,4 @@
-package main
+package updater
 
 import (
 	"io"
@@ -23,7 +23,7 @@ func openErrorLog(path string, limit int64) (*errorLog, error) {
 	output := &errorLog{File: file, limit: limit}
 	// Also shrink logs left by older versions, even if this run has no errors.
 	if _, err := output.Write(nil); err != nil {
-		file.Close()
+		_ = file.Close()
 		return nil, err
 	}
 	return output, nil
@@ -39,25 +39,25 @@ func (l *errorLog) Write(data []byte) (int, error) {
 	if int64(size) > l.limit {
 		data = data[size-int(l.limit):]
 	}
-	info, err := l.File.Stat()
+	info, err := l.Stat()
 	if err != nil {
 		return 0, err
 	}
 	if info.Size() > l.limit-int64(len(data)) {
 		tail := make([]byte, l.limit-int64(len(data)))
 		if len(tail) > 0 {
-			if _, err := l.File.ReadAt(tail, info.Size()-int64(len(tail))); err != nil {
+			if _, err := l.ReadAt(tail, info.Size()-int64(len(tail))); err != nil {
 				return 0, err
 			}
 		}
-		if err := l.File.Truncate(0); err != nil {
+		if err := l.Truncate(0); err != nil {
 			return 0, err
 		}
-		if _, err := l.File.WriteAt(tail, 0); err != nil {
+		if _, err := l.WriteAt(tail, 0); err != nil {
 			return 0, err
 		}
 	}
-	if _, err := l.File.Seek(0, io.SeekEnd); err != nil {
+	if _, err := l.Seek(0, io.SeekEnd); err != nil {
 		return 0, err
 	}
 	if _, err := l.File.Write(data); err != nil {

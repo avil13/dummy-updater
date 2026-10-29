@@ -1,4 +1,4 @@
-package main
+package updater
 
 import (
 	"errors"
@@ -26,7 +26,7 @@ func (t *projectTranscript) Write(data []byte) (int, error) {
 	}
 	for len(data) > 0 {
 		size := min(len(data), int(t.limit-t.pos))
-		n, err := t.File.WriteAt(data[:size], t.pos)
+		n, err := t.WriteAt(data[:size], t.pos)
 		written += n
 		t.pos += int64(n)
 		if t.pos == t.limit {
@@ -47,9 +47,9 @@ func (t *projectTranscript) Close() error {
 	var err error
 	if t.full && t.pos != 0 {
 		data := make([]byte, t.limit)
-		if _, err = t.File.ReadAt(data, 0); err == nil {
-			if _, err = t.File.WriteAt(data[t.pos:], 0); err == nil {
-				_, err = t.File.WriteAt(data[:t.pos], t.limit-t.pos)
+		if _, err = t.ReadAt(data, 0); err == nil {
+			if _, err = t.WriteAt(data[t.pos:], 0); err == nil {
+				_, err = t.WriteAt(data[:t.pos], t.limit-t.pos)
 			}
 		}
 	}

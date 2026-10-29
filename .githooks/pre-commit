@@ -2,15 +2,30 @@
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
-# Build the staged snapshot, not potentially unstaged source files.
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+source_state() {
+  while IFS= read -r -d '' file; do
+    if [[ -f "$file" ]]; then
+      printf '%s\0' "$file"
+      git hash-object -- "$file"
+    fi
+  done < <(git ls-files --cached --others --exclude-standard -z -- '*.go')
+}
+source_state > "$TMP/before-lint"
+golangci-lint run --fix
+source_state > "$TMP/after-lint"
+if ! cmp -s "$TMP/before-lint" "$TMP/after-lint"; then
+  echo "golangci-lint fixed Go files; review and stage the changes, then commit again." >&2
+  exit 1
+fi
+# Build the staged snapshot, not potentially unstaged source files.
 git checkout-index --all --prefix="$TMP/"
 cd "$TMP"
 go test ./...
 for OS in linux darwin; do
   for ARCH in amd64 arm64; do
-    CGO_ENABLED=0 GOOS="$OS" GOARCH="$ARCH" go build -trimpath -ldflags="-s -w" -o "$TMP/updater-$OS-$ARCH" .
+    CGO_ENABLED=0 GOOS="$OS" GOARCH="$ARCH" go build -trimpath -ldflags="-s -w" -o "$TMP/updater-$OS-$ARCH" ./cmd/updater
   done
 done
 mkdir -p "$ROOT/dist"

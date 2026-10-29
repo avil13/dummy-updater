@@ -1,4 +1,4 @@
-package main
+package updater
 
 import (
 	"bufio"
@@ -21,7 +21,7 @@ func stopItem(ctx context.Context, path string, input io.Reader, output io.Write
 	if err != nil {
 		return err
 	}
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	c, err := readConfig(path)
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func stopItem(ctx context.Context, path string, input io.Reader, output io.Write
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	if _, err := command(ctx, entry.Target, output, "docker", "compose", "stop"); err != nil {
 		logger := log.New(io.MultiWriter(file, os.Stderr), "["+entry.Target+"] ", log.LstdFlags)
 		logger.Printf("ERROR: stop: %v", err)
