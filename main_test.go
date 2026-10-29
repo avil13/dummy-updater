@@ -19,7 +19,7 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 		}
 	}
 	t.Setenv("PATH", dir)
-	path := filepath.Join(dir, "update-items.json")
+	path := filepath.Join(dir, "config.json")
 	if err := os.WriteFile(path, []byte(`{"items":[{"repo":"repo","target":"project","run":"docker compose up -d"}]}`), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestValidateConfigRepoWhitespace(t *testing.T) {
 	} {
 		t.Run(repo, func(t *testing.T) {
 			data := []byte(`{"items":[{"repo":"` + repo + `","target":"project","run":"true"}]}`)
-			_, err := validateConfig(data, filepath.Join(t.TempDir(), "update-items.json"))
+			_, err := validateConfig(data, filepath.Join(t.TempDir(), "config.json"))
 			if err == nil || err.Error() != "items[0].repo: leading or trailing whitespace is not allowed" {
 				t.Fatalf("expected repo whitespace validation error, got %v", err)
 			}
@@ -159,7 +159,7 @@ func TestReadConfig(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
-			path := filepath.Join(dir, "update-items.json")
+			path := filepath.Join(dir, "config.json")
 			if err := os.WriteFile(path, []byte(tc.data), 0600); err != nil {
 				t.Fatal(err)
 			}

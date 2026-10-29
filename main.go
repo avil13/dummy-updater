@@ -263,7 +263,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	path := flag.String("config", filepath.Join(filepath.Dir(executable), "update-items.json"), "path to update-items.json")
+	path := flag.String("config", filepath.Join(filepath.Dir(executable), "config.json"), "path to config.json")
 	flag.Parse()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

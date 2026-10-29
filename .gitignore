@@ -1,5 +1,5 @@
 /update.log
 error.log
-/update-items.json.lock
+/config.json.lock
 
-update-items.json
+config.json

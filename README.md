@@ -13,7 +13,7 @@
 
 ## Настройка
 
-1. Заполните `update-items.json`: `repo` — URL для клонирования,
+1. Заполните `config.json`: `repo` — URL для клонирования,
    `target` — директория проекта, `run` — непустая строка команды запуска.
    Все три поля обязательны. Необязательное поле `retry` — число дополнительных
    попыток `run` после ошибки (целое число ≥ 0, по умолчанию 2).
@@ -22,9 +22,9 @@
    `git remote get-url origin`.
 2. Установите Git, Docker и Compose plugin на Linux или macOS.
 3. Запустите `bash update.sh` или нужный бинарник:
-   `./dist/updater-linux-amd64 -config ./update-items.json`.
+   `./dist/updater-linux-amd64 -config ./config.json`.
 
-Пример `update-items.json` для двух проектов:
+Пример `config.json` для двух проектов:
 
 ```json
 {
@@ -54,10 +54,10 @@
 bash update.sh
 
 # Другая конфигурация
-bash update.sh -config /absolute/path/update-items.json
+bash update.sh -config /absolute/path/config.json
 
 # Прямой запуск, например на Apple Silicon
-./dist/updater-darwin-arm64 -config ./update-items.json
+./dist/updater-darwin-arm64 -config ./config.json
 ```
 
 `update.sh` автоматически выбирает Linux/macOS и amd64/arm64.
