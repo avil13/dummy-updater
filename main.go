@@ -23,6 +23,7 @@ import (
 type item struct {
 	Repo   string `json:"repo"`
 	Target string `json:"target"`
+	Run    string `json:"run"`
 }
 
 type config struct {
@@ -49,8 +50,8 @@ func readConfig(path string) (config, error) {
 	seen := map[string]bool{}
 	for i := range c.Items {
 		entry := &c.Items[i]
-		if strings.TrimSpace(entry.Repo) == "" || strings.TrimSpace(entry.Target) == "" {
-			return c, fmt.Errorf("items[%d]: repo and target are required", i)
+		if strings.TrimSpace(entry.Repo) == "" || strings.TrimSpace(entry.Target) == "" || strings.TrimSpace(entry.Run) == "" {
+			return c, fmt.Errorf("items[%d]: repo, target and run are required", i)
 		}
 		if !filepath.IsAbs(entry.Target) {
 			entry.Target = filepath.Join(filepath.Dir(path), entry.Target)
@@ -130,12 +131,13 @@ func update(ctx context.Context, entry item, output io.Writer, logger *log.Logge
 		return err
 	}
 	// Run even without new commits so a failed deployment is retried next time.
-	if _, err := command(ctx, entry.Target, output, "docker", "compose", "up", "-d", "--build", "--remove-orphans"); err != nil {
+	// The trusted config intentionally supplies a shell command.
+	if _, err := command(ctx, entry.Target, output, "sh", "-c", entry.Run); err != nil {
 		if ctx.Err() == nil {
 			_, _ = command(ctx, entry.Target, output, "docker", "compose", "ps")
 			_, _ = command(ctx, entry.Target, output, "docker", "compose", "logs", "--tail=30")
 		}
-		return fmt.Errorf("compose up: %w", err)
+		return fmt.Errorf("run: %w", err)
 	}
 	if _, err := command(ctx, entry.Target, output, "docker", "compose", "ps"); err != nil {
 		return err

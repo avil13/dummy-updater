@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,7 +19,7 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 	}
 	t.Setenv("PATH", dir)
 	path := filepath.Join(dir, "update-items.json")
-	if err := os.WriteFile(path, []byte(`{"items":[{"repo":"repo","target":"project"}]}`), 0600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"items":[{"repo":"repo","target":"project","run":"docker compose up -d"}]}`), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := run(context.Background(), path); err == nil {
@@ -33,18 +35,56 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 	}
 }
 
+func TestUpdateRun(t *testing.T) {
+	dir := t.TempDir()
+	git := "#!/bin/sh\ncase \"$1\" in\nremote) echo repo;;\nrev-parse) echo commit;;\nesac\n"
+	for name, script := range map[string]string{"git": git, "docker": "#!/bin/sh\nexit 0\n"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(script), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	target := filepath.Join(dir, "project one")
+	if err := os.MkdirAll(filepath.Join(target, ".git"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	entry := item{Repo: "repo", Target: target, Run: `printf '%s\n' 'custom command' >> 'run output'`}
+	logger := log.New(io.Discard, "", 0)
+	for i := 0; i < 2; i++ {
+		if err := update(context.Background(), entry, io.Discard, logger); err != nil {
+			t.Fatal(err)
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(target, "run output"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "custom command\ncustom command\n" {
+		t.Fatalf("unexpected run output: %q", data)
+	}
+	entry.Run = "exit 7"
+	if err := update(context.Background(), entry, io.Discard, logger); err == nil || !strings.Contains(err.Error(), "run: exit status 7") {
+		t.Fatalf("expected run failure, got %v", err)
+	}
+}
+
 func TestReadConfig(t *testing.T) {
 	for _, tc := range []struct {
 		name, data string
 		valid      bool
 	}{
-		{"valid", `{"items":[{"repo":"git@example:repo.git","target":"project one"},{"repo":"https://example.org/two.git","target":"project two"}]}`, true},
+		{"valid", `{"items":[{"repo":"git@example:repo.git","target":"project one","run":"docker compose up -d"},{"repo":"https://example.org/two.git","target":"project two","run":"docker compose up -d --build"}]}`, true},
 		{"empty", `{"items":[]}`, false},
-		{"missing repo", `{"items":[{"target":"project"}]}`, false},
-		{"missing target", `{"items":[{"repo":"repo"}]}`, false},
-		{"typo", `{"items":[{"repo:":"repo","target":"project"}]}`, false},
-		{"duplicate", `{"items":[{"repo":"a","target":"project"},{"repo":"b","target":"./project"}]}`, false},
-		{"trailing JSON", `{"items":[{"repo":"a","target":"project"}]} {}`, false},
+		{"missing repo", `{"items":[{"target":"project","run":"true"}]}`, false},
+		{"missing target", `{"items":[{"repo":"repo","run":"true"}]}`, false},
+		{"missing run", `{"items":[{"repo":"repo","target":"project"}]}`, false},
+		{"empty run", `{"items":[{"repo":"repo","target":"project","run":""}]}`, false},
+		{"blank run", `{"items":[{"repo":"repo","target":"project","run":" \t\n"}]}`, false},
+		{"null run", `{"items":[{"repo":"repo","target":"project","run":null}]}`, false},
+		{"invalid run type", `{"items":[{"repo":"repo","target":"project","run":true}]}`, false},
+		{"typo", `{"items":[{"repo:":"repo","target":"project","run":"true"}]}`, false},
+		{"duplicate", `{"items":[{"repo":"a","target":"project","run":"true"},{"repo":"b","target":"./project","run":"true"}]}`, false},
+		{"trailing JSON", `{"items":[{"repo":"a","target":"project","run":"true"}]} {}`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -58,6 +98,9 @@ func TestReadConfig(t *testing.T) {
 			}
 			if tc.valid && c.Items[0].Target != filepath.Join(dir, "project one") {
 				t.Fatalf("unexpected target: %s", c.Items[0].Target)
+			}
+			if tc.valid && c.Items[0].Run != "docker compose up -d" {
+				t.Fatalf("unexpected run: %s", c.Items[0].Run)
 			}
 		})
 	}
