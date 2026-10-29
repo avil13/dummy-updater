@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -79,6 +80,37 @@ func TestUpdateRun(t *testing.T) {
 	if string(data) != "custom command\ncustom command\n" {
 		t.Fatalf("unexpected run output: %q", data)
 	}
+	zero, four := 0, 4
+	for _, tc := range []struct {
+		name      string
+		retry     *int
+		succeedAt int
+		attempts  string
+		wantError bool
+	}{
+		{"default succeeds on third attempt", nil, 3, "3", false},
+		{"default exhausted", nil, 4, "3", true},
+		{"disabled", &zero, 2, "1", true},
+		{"custom succeeds on fifth attempt", &four, 5, "5", false},
+		{"custom exhausted", &four, 6, "5", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			counter := filepath.Join(target, "attempts")
+			if err := os.WriteFile(counter, []byte("0"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			entry.Retry = tc.retry
+			entry.Run = `n=$(cat attempts); n=$((n + 1)); printf '%s' "$n" > attempts; [ "$n" -ge ` + fmt.Sprint(tc.succeedAt) + ` ]`
+			err := update(context.Background(), entry, io.Discard, logger)
+			if (err != nil) != tc.wantError {
+				t.Fatalf("wantError=%v, got %v", tc.wantError, err)
+			}
+			data, err := os.ReadFile(counter)
+			if err != nil || string(data) != tc.attempts {
+				t.Fatalf("expected %s attempts, got %q, err=%v", tc.attempts, data, err)
+			}
+		})
+	}
 	entry.Run = "exit 7"
 	if err := update(context.Background(), entry, io.Discard, logger); err == nil || !strings.Contains(err.Error(), "run: exit status 7") {
 		t.Fatalf("expected run failure, got %v", err)
@@ -108,6 +140,11 @@ func TestReadConfig(t *testing.T) {
 		valid      bool
 	}{
 		{"valid", `{"items":[{"repo":"git@example:repo.git","target":"project one","run":"docker compose up -d"},{"repo":"https://example.org/two.git","target":"project two","run":"docker compose up -d --build"}]}`, true},
+		{"retry zero", `{"items":[{"repo":"repo","target":"project one","run":"docker compose up -d","retry":0}]}`, true},
+		{"retry positive", `{"items":[{"repo":"repo","target":"project one","run":"docker compose up -d","retry":2}]}`, true},
+		{"retry negative", `{"items":[{"repo":"repo","target":"project","run":"true","retry":-1}]}`, false},
+		{"retry wrong type", `{"items":[{"repo":"repo","target":"project","run":"true","retry":"2"}]}`, false},
+		{"retry fractional", `{"items":[{"repo":"repo","target":"project","run":"true","retry":1.5}]}`, false},
 		{"empty", `{"items":[]}`, false},
 		{"missing repo", `{"items":[{"target":"project","run":"true"}]}`, false},
 		{"missing target", `{"items":[{"repo":"repo","run":"true"}]}`, false},

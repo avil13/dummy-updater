@@ -3,7 +3,8 @@
     {
       "repo": "git@github.com:YOUR_USER/my-repo.git",
       "target": "/home/master/git/my-repo",
-      "run": "docker compose up -d --build --remove-orphans"
+      "run": "docker compose up -d --build --remove-orphans",
+      "retry": 3
     }
   ]
 }

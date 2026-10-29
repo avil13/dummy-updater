@@ -24,6 +24,7 @@ type item struct {
 	Repo   string `json:"repo"`
 	Target string `json:"target"`
 	Run    string `json:"run"`
+	Retry  *int   `json:"retry"`
 }
 
 type config struct {
@@ -56,6 +57,9 @@ func validateConfig(data []byte, path string) (config, error) {
 		entry := &c.Items[i]
 		if strings.TrimSpace(entry.Repo) == "" || strings.TrimSpace(entry.Target) == "" || strings.TrimSpace(entry.Run) == "" {
 			return c, fmt.Errorf("items[%d]: repo, target and run are required", i)
+		}
+		if entry.Retry != nil && *entry.Retry < 0 {
+			return c, fmt.Errorf("items[%d].retry: must be non-negative", i)
 		}
 		if entry.Repo != strings.TrimSpace(entry.Repo) {
 			return c, fmt.Errorf("items[%d].repo: leading or trailing whitespace is not allowed", i)
@@ -140,12 +144,27 @@ func update(ctx context.Context, entry item, output io.Writer, logger *log.Logge
 	}
 	// Run even without new commits so a failed deployment is retried next time.
 	// The trusted config intentionally supplies a shell command.
-	if _, err := command(ctx, entry.Target, output, "sh", "-c", entry.Run); err != nil {
-		if ctx.Err() == nil {
-			_, _ = command(ctx, entry.Target, output, "docker", "compose", "ps")
-			_, _ = command(ctx, entry.Target, output, "docker", "compose", "logs", "--tail=30")
+	retry := 2
+	if entry.Retry != nil {
+		retry = *entry.Retry
+	}
+	for attempt := 0; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
 		}
-		return fmt.Errorf("run: %w", err)
+		_, err := command(ctx, entry.Target, output, "sh", "-c", entry.Run)
+		if err == nil {
+			break
+		}
+		if ctx.Err() != nil {
+			return fmt.Errorf("run: %w", err)
+		}
+		_, _ = command(ctx, entry.Target, output, "docker", "compose", "ps")
+		_, _ = command(ctx, entry.Target, output, "docker", "compose", "logs", "--tail=30")
+		if attempt >= retry {
+			return fmt.Errorf("run: %w", err)
+		}
+		logger.Printf("WARNING: run attempt %d failed: %v; retrying", attempt+1, err)
 	}
 	if _, err := command(ctx, entry.Target, output, "docker", "compose", "ps"); err != nil {
 		return err
