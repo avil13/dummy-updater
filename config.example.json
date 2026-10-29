@@ -1,4 +1,10 @@
 {
+  "tg": {
+    "enabled": false,
+    "only_errors": false,
+    "bot_token": "",
+    "chat_id": ""
+  },
   "items": [
     {
       "repo": "git@github.com:YOUR_USER/my-repo.git",

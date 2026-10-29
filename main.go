@@ -28,8 +28,16 @@ type item struct {
 	Enabled *bool  `json:"enabled,omitempty"`
 }
 
+type telegramConfig struct {
+	Enabled    bool   `json:"enabled"`
+	BotToken   string `json:"bot_token"`
+	ChatID     string `json:"chat_id"`
+	OnlyErrors bool   `json:"only_errors"`
+}
+
 type config struct {
-	Items []item `json:"items"`
+	Items []item          `json:"items"`
+	TG    *telegramConfig `json:"tg,omitempty"`
 }
 
 func (c config) enabledItems() []item {
@@ -62,6 +70,9 @@ func validateConfig(data []byte, path string) (config, error) {
 	}
 	if len(c.Items) == 0 {
 		return c, errors.New("items must not be empty")
+	}
+	if c.TG != nil && c.TG.Enabled && (strings.TrimSpace(c.TG.BotToken) == "" || strings.TrimSpace(c.TG.ChatID) == "") {
+		return c, errors.New("tg: bot_token and chat_id are required when enabled")
 	}
 	seen := map[string]bool{}
 	for i := range c.Items {
@@ -108,50 +119,50 @@ func command(ctx context.Context, dir string, output io.Writer, name string, arg
 	return strings.TrimSpace(buf.String()), err
 }
 
-func update(ctx context.Context, entry item, output io.Writer, logger *log.Logger) error {
+func update(ctx context.Context, entry item, output io.Writer, logger *log.Logger) (result string, err error) {
 	cloned := false
 	if _, err := os.Stat(entry.Target); errors.Is(err, os.ErrNotExist) {
 		if err := os.MkdirAll(filepath.Dir(entry.Target), 0755); err != nil {
-			return err
+			return "", err
 		}
 		if _, err := command(ctx, "", output, "git", "clone", "--", entry.Repo, entry.Target); err != nil {
-			return fmt.Errorf("clone: %w", err)
+			return "", fmt.Errorf("clone: %w", err)
 		}
 		cloned = true
 	} else if err != nil {
-		return err
+		return "", err
 	}
 	// Require the target itself to be a repository, not a directory inside one.
 	if _, err := os.Stat(filepath.Join(entry.Target, ".git")); err != nil {
-		return fmt.Errorf("target is not a Git repository: %w", err)
+		return "", fmt.Errorf("target is not a Git repository: %w", err)
 	}
 	remote, err := command(ctx, entry.Target, nil, "git", "remote", "get-url", "origin")
 	if err != nil {
-		return err
+		return "", err
 	}
 	if remote != entry.Repo {
-		return errors.New("origin does not match configured repo")
+		return "", errors.New("origin does not match configured repo")
 	}
 	status, err := command(ctx, entry.Target, nil, "git", "status", "--porcelain")
 	if err != nil {
-		return err
+		return "", err
 	}
 	if status != "" {
 		logger.Print("WARNING: local changes; skipping")
-		return nil
+		return "⏭ локальные изменения", nil
 	}
 	before, err := command(ctx, entry.Target, nil, "git", "rev-parse", "HEAD")
 	if err != nil {
-		return err
+		return "", err
 	}
 	if !cloned {
 		if _, err := command(ctx, entry.Target, output, "git", "pull", "--ff-only"); err != nil {
-			return fmt.Errorf("pull: %w", err)
+			return "", fmt.Errorf("pull: %w", err)
 		}
 	}
 	after, err := command(ctx, entry.Target, nil, "git", "rev-parse", "HEAD")
 	if err != nil {
-		return err
+		return "", err
 	}
 	// Run even without new commits so a failed deployment is retried next time.
 	// The trusted config intentionally supplies a shell command.
@@ -161,54 +172,52 @@ func update(ctx context.Context, entry item, output io.Writer, logger *log.Logge
 	}
 	for attempt := 0; ; attempt++ {
 		if err := ctx.Err(); err != nil {
-			return err
+			return "", err
 		}
 		_, err := command(ctx, entry.Target, output, "sh", "-c", entry.Run)
 		if err == nil {
 			break
 		}
 		if ctx.Err() != nil {
-			return fmt.Errorf("run: %w", err)
+			return "", fmt.Errorf("run: %w", err)
 		}
 		_, _ = command(ctx, entry.Target, output, "docker", "compose", "ps")
 		_, _ = command(ctx, entry.Target, output, "docker", "compose", "logs", "--tail=30")
 		if attempt >= retry {
-			return fmt.Errorf("run: %w", err)
+			return "", fmt.Errorf("run: %w", err)
 		}
 		logger.Printf("WARNING: run attempt %d failed: %v; retrying", attempt+1, err)
 	}
 	if _, err := command(ctx, entry.Target, output, "docker", "compose", "ps"); err != nil {
-		return err
+		return "", err
 	}
 	logger.Printf("SUCCESS: %s -> %s", before, after)
-	if cloned || before != after {
-		details, err := command(ctx, entry.Target, nil, "git", "log", "-1", "--format=%an: %s")
-		if err != nil {
-			return err
-		}
-		host, _ := os.Hostname()
-		notify(ctx, fmt.Sprintf("Updated %s\n%s -> %s\n%s\nHost: %s\nDocker Compose started", entry.Target, before, after, details, host), logger)
+	if cloned {
+		return "✅ клонирован, run выполнен", nil
 	}
-	return nil
+	if before != after {
+		return "✅ обновлён, run выполнен", nil
+	}
+	return "✅ без новых коммитов, run выполнен", nil
 }
 
-func notify(ctx context.Context, message string, logger *log.Logger) {
-	if os.Getenv("TELEGRAM_ENABLED") != "true" {
+func notify(ctx context.Context, tg telegramConfig, message string, logger *log.Logger) {
+	if !tg.Enabled {
 		return
 	}
-	token, chat := os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID")
+	token, chat := tg.BotToken, tg.ChatID
 	if token == "" || chat == "" {
 		logger.Print("WARNING: Telegram credentials missing")
 		return
 	}
-	body := url.Values{"chat_id": {chat}, "text": {message}}
+	body := url.Values{"chat_id": {chat}, "text": {message}, "disable_web_page_preview": {"true"}}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.telegram.org/bot"+token+"/sendMessage", strings.NewReader(body.Encode()))
 	if err != nil {
 		logger.Print("WARNING: invalid Telegram configuration")
 		return
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	resp, err := client.Do(req)
 	if err != nil {
 		logger.Print("WARNING: Telegram request failed")
@@ -217,10 +226,17 @@ func notify(ctx context.Context, message string, logger *log.Logger) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		logger.Printf("WARNING: Telegram HTTP %d", resp.StatusCode)
+		return
+	}
+	var response struct {
+		OK bool `json:"ok"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 65536)).Decode(&response); err != nil || !response.OK {
+		logger.Print("WARNING: Telegram rejected report")
 	}
 }
 
-func run(ctx context.Context, path string) error {
+func run(ctx context.Context, path string) (runErr error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -241,6 +257,51 @@ func run(ctx context.Context, path string) error {
 	defer file.Close()
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 	errorLogger := log.New(io.MultiWriter(file, os.Stderr), "", log.LstdFlags)
+	tg := c.TG
+	if tg == nil {
+		tg = &telegramConfig{Enabled: os.Getenv("TELEGRAM_ENABLED") == "true", BotToken: os.Getenv("TELEGRAM_BOT_TOKEN"), ChatID: os.Getenv("TELEGRAM_CHAT_ID")}
+	}
+	statuses := make([]string, len(c.Items))
+	projectErrors := make([]bool, len(c.Items))
+	failed := false
+	for i, entry := range c.Items {
+		statuses[i] = "⏭ не выполнен"
+		if entry.Enabled != nil && !*entry.Enabled {
+			statuses[i] = "⏭ отключён"
+		}
+	}
+	defer func() {
+		if !tg.Enabled {
+			return
+		}
+		logger.SetPrefix("")
+		host, _ := os.Hostname()
+		message := "Отчёт updater — " + host
+		hasReport := false
+		if runErr != nil && !failed {
+			message += "\n❌ запуск не завершён (подробности в stderr)"
+			hasReport = true
+		}
+		for i, entry := range c.Items {
+			if tg.OnlyErrors && !projectErrors[i] {
+				continue
+			}
+			hasReport = true
+			line := "\n" + entry.Target + ": " + statuses[i]
+			// Keep each message below Telegram’s 4096-character limit.
+			if len([]rune(line)) > 3500 {
+				line = string([]rune(line)[:3500]) + "…"
+			}
+			if len([]rune(message+line)) > 4000 {
+				notify(context.WithoutCancel(ctx), *tg, message, logger)
+				message = "Отчёт updater (продолжение)"
+			}
+			message += line
+		}
+		if hasReport {
+			notify(context.WithoutCancel(ctx), *tg, message, logger)
+		}
+	}()
 	items := c.enabledItems()
 	if len(items) == 0 {
 		logger.Print("No enabled projects")
@@ -251,14 +312,20 @@ func run(ctx context.Context, path string) error {
 			return err
 		}
 	}
-	failed := false
-	for _, entry := range items {
+	for i, entry := range c.Items {
+		if entry.Enabled != nil && !*entry.Enabled {
+			continue
+		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 		logger.SetPrefix("[" + entry.Target + "] ")
 		logger.Print("Checking project")
-		if err := update(ctx, entry, os.Stdout, logger); err != nil {
+		status, err := update(ctx, entry, os.Stdout, logger)
+		statuses[i] = status
+		if err != nil {
+			projectErrors[i] = true
+			statuses[i] = "❌ ошибка (подробности в error.log)"
 			errorLogger.SetPrefix("[" + entry.Target + "] ")
 			errorLogger.Printf("ERROR: %v", err)
 			failed = true

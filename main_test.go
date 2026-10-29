@@ -69,7 +69,7 @@ func TestUpdateRun(t *testing.T) {
 	entry := item{Repo: "repo", Target: target, Run: `printf '%s\n' 'custom command' >> 'run output'`}
 	logger := log.New(io.Discard, "", 0)
 	for i := 0; i < 2; i++ {
-		if err := update(context.Background(), entry, io.Discard, logger); err != nil {
+		if _, err := update(context.Background(), entry, io.Discard, logger); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -101,7 +101,7 @@ func TestUpdateRun(t *testing.T) {
 			}
 			entry.Retry = tc.retry
 			entry.Run = `n=$(cat attempts); n=$((n + 1)); printf '%s' "$n" > attempts; [ "$n" -ge ` + fmt.Sprint(tc.succeedAt) + ` ]`
-			err := update(context.Background(), entry, io.Discard, logger)
+			_, err := update(context.Background(), entry, io.Discard, logger)
 			if (err != nil) != tc.wantError {
 				t.Fatalf("wantError=%v, got %v", tc.wantError, err)
 			}
@@ -112,7 +112,7 @@ func TestUpdateRun(t *testing.T) {
 		})
 	}
 	entry.Run = "exit 7"
-	if err := update(context.Background(), entry, io.Discard, logger); err == nil || !strings.Contains(err.Error(), "run: exit status 7") {
+	if _, err := update(context.Background(), entry, io.Discard, logger); err == nil || !strings.Contains(err.Error(), "run: exit status 7") {
 		t.Fatalf("expected run failure, got %v", err)
 	}
 }
