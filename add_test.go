@@ -16,7 +16,7 @@ func TestAddItem(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "config.json")
 			for i := 0; i < 2; i++ {
 				target := []string{"project one", "project two"}[i]
-				input := "git@example.org:repo.git\n" + target + "\nprintf '%s' \"hello\"\n" + retry + "\n"
+				input := "git@example.org:repo.git\n" + target + "\nprintf '%s' \"hello\"\n" + retry + "\n\n"
 				if err := addItem(path, "", strings.NewReader(input), io.Discard); err != nil {
 					t.Fatal(err)
 				}
@@ -31,6 +31,9 @@ func TestAddItem(t *testing.T) {
 			}
 			if len(c.Items) != 2 || c.Items[0].Target != "project one" || c.Items[1].Target != "project two" || c.Items[1].Run != `printf '%s' "hello"` {
 				t.Fatalf("unexpected config: %+v", c)
+			}
+			if c.Items[1].Enabled == nil || !*c.Items[1].Enabled {
+				t.Fatal("expected enabled: true for new item")
 			}
 			if retry == "" && (c.Items[1].Retry == nil || *c.Items[1].Retry != 3) {
 				t.Fatal("expected default retry")
@@ -52,7 +55,7 @@ func TestAddItem(t *testing.T) {
 func TestAddItemDefaultRun(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	var output strings.Builder
-	if err := addItem(path, "", strings.NewReader("repo\nproject\n\n\n"), &output); err != nil {
+	if err := addItem(path, "", strings.NewReader("repo\nproject\n\n\n\n"), &output); err != nil {
 		t.Fatal(err)
 	}
 	c, err := readConfig(path)
@@ -76,22 +79,46 @@ func TestAddItemDefaultRun(t *testing.T) {
 	}
 }
 
+func TestAddItemEnabled(t *testing.T) {
+	for _, value := range []string{"", "true", "false"} {
+		t.Run("enabled="+value, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			var output strings.Builder
+			if err := addItem(path, "", strings.NewReader("repo\nproject\n\n\n"+value+"\n"), &output); err != nil {
+				t.Fatal(err)
+			}
+			c, err := readConfig(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.Items[0].Enabled == nil || *c.Items[0].Enabled != (value != "false") {
+				t.Fatalf("unexpected enabled: %v", c.Items[0].Enabled)
+			}
+			if !strings.Contains(output.String(), "enabled — enable project [true]") {
+				t.Fatalf("missing enabled prompt: %s", &output)
+			}
+		})
+	}
+}
+
 func TestAddItemDoesNotOverwriteOnError(t *testing.T) {
 	original := `{"items":[{"repo":"repo","target":"project","run":"true"}]}`
 	for _, tc := range []struct {
 		name, data, input string
 		locked            bool
 	}{
-		{"duplicate target", original, "other\n./project\ntrue\n\n", false},
-		{"missing repo", original, "\nnew\ntrue\n\n", false},
-		{"missing target", original, "repo\n\ntrue\n\n", false},
-		{"blank run", original, "repo\nnew\n \t\n\n", false},
+		{"duplicate target", original, "other\n./project\ntrue\n\n\n", false},
+		{"missing repo", original, "\nnew\ntrue\n\n\n", false},
+		{"missing target", original, "repo\n\ntrue\n\n\n", false},
+		{"blank run", original, "repo\nnew\n \t\n\n\n", false},
 		{"negative retry", original, "repo\nnew\ntrue\n-1\n", false},
 		{"invalid retry", original, "repo\nnew\ntrue\n1.5\n", false},
 		{"interrupted", original, "repo\nnew\n", false},
-		{"invalid config", `{"items":`, "repo\nnew\ntrue\n\n", false},
-		{"unknown field", `{"items":[],"typo":true}`, "repo\nnew\ntrue\n\n", false},
-		{"locked", original, "repo\nnew\ntrue\n\n", true},
+		{"invalid config", `{"items":`, "repo\nnew\ntrue\n\n\n", false},
+		{"unknown field", `{"items":[],"typo":true}`, "repo\nnew\ntrue\n\n\n", false},
+		{"locked", original, "repo\nnew\ntrue\n\n\n", true},
+		{"invalid enabled", original, "repo\nnew\ntrue\n\nyes\n", false},
+		{"interrupted enabled", original, "repo\nnew\ntrue\n\n", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "config.json")

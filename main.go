@@ -21,14 +21,25 @@ import (
 )
 
 type item struct {
-	Repo   string `json:"repo"`
-	Target string `json:"target"`
-	Run    string `json:"run"`
-	Retry  *int   `json:"retry"`
+	Repo    string `json:"repo"`
+	Target  string `json:"target"`
+	Run     string `json:"run"`
+	Retry   *int   `json:"retry"`
+	Enabled *bool  `json:"enabled,omitempty"`
 }
 
 type config struct {
 	Items []item `json:"items"`
+}
+
+func (c config) enabledItems() []item {
+	var items []item
+	for _, entry := range c.Items {
+		if entry.Enabled == nil || *entry.Enabled {
+			items = append(items, entry)
+		}
+	}
+	return items
 }
 
 func readConfig(path string) (config, error) {
@@ -230,13 +241,18 @@ func run(ctx context.Context, path string) error {
 	defer file.Close()
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 	errorLogger := log.New(io.MultiWriter(file, os.Stderr), "", log.LstdFlags)
+	items := c.enabledItems()
+	if len(items) == 0 {
+		logger.Print("No enabled projects")
+		return nil
+	}
 	for _, name := range []string{"git", "docker"} {
 		if _, err := exec.LookPath(name); err != nil {
 			return err
 		}
 	}
 	failed := false
-	for _, entry := range c.Items {
+	for _, entry := range items {
 		if err := ctx.Err(); err != nil {
 			return err
 		}

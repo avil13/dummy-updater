@@ -50,7 +50,8 @@ func addItem(path, directory string, input io.Reader, output io.Writer) error {
 	}
 	const defaultRun = "docker compose up -d --build --remove-orphans"
 	retryDefault := 3
-	entry := item{Run: defaultRun, Retry: &retryDefault}
+	enabled := true
+	entry := item{Run: defaultRun, Retry: &retryDefault, Enabled: &enabled}
 	if directory != "" {
 		entry.Target, err = filepath.Abs(directory)
 		if err != nil {
@@ -97,6 +98,18 @@ func addItem(path, directory string, input io.Reader, output io.Writer) error {
 			return errors.New("retry must be a non-negative integer")
 		}
 		entry.Retry = &n
+	}
+	value, err := ask("enabled — enable project [true] (true/false): ")
+	if err != nil {
+		return err
+	}
+	switch strings.TrimSpace(value) {
+	case "", "true":
+		enabled = true
+	case "false":
+		enabled = false
+	default:
+		return errors.New("enabled must be true or false")
 	}
 	lock, err := acquireConfigLock(path)
 	if err != nil {

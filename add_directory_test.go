@@ -13,8 +13,8 @@ func TestAddItemDirectory(t *testing.T) {
 		name, input           string
 		edit, noGit, noOrigin bool
 	}{
-		{name: "defaults", input: "\n\n\n\n"},
-		{name: "editable", input: "other-repo\nother-target\ncustom-run\n0\n", edit: true},
+		{name: "defaults", input: "\n\n\n\n\n"},
+		{name: "editable", input: "other-repo\nother-target\ncustom-run\n0\n\n", edit: true},
 		{name: "not a repository", noGit: true},
 		{name: "missing origin", noOrigin: true},
 	} {

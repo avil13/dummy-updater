@@ -26,7 +26,12 @@ func stopItem(ctx context.Context, path string, input io.Reader, output io.Write
 	if err != nil {
 		return err
 	}
-	for i, entry := range c.Items {
+	items := c.enabledItems()
+	if len(items) == 0 {
+		_, err := fmt.Fprintln(output, "No enabled projects")
+		return err
+	}
+	for i, entry := range items {
 		if _, err := fmt.Fprintf(output, "%d) %s\n", i+1, entry.Target); err != nil {
 			return err
 		}
@@ -58,10 +63,10 @@ func stopItem(ctx context.Context, path string, input io.Reader, output io.Write
 		return nil
 	}
 	n, err := strconv.Atoi(line)
-	if err != nil || n < 1 || n > len(c.Items) {
-		return fmt.Errorf("select a project number from 1 to %d", len(c.Items))
+	if err != nil || n < 1 || n > len(items) {
+		return fmt.Errorf("select a project number from 1 to %d", len(items))
 	}
-	entry := c.Items[n-1]
+	entry := items[n-1]
 	file, err := os.OpenFile(filepath.Join(filepath.Dir(path), "error.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
