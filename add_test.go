@@ -17,7 +17,7 @@ func TestAddItem(t *testing.T) {
 			for i := 0; i < 2; i++ {
 				target := []string{"project one", "project two"}[i]
 				input := "git@example.org:repo.git\n" + target + "\nprintf '%s' \"hello\"\n" + retry + "\n"
-				if err := addItem(path, strings.NewReader(input), io.Discard); err != nil {
+				if err := addItem(path, "", strings.NewReader(input), io.Discard); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -32,7 +32,7 @@ func TestAddItem(t *testing.T) {
 			if len(c.Items) != 2 || c.Items[0].Target != "project one" || c.Items[1].Target != "project two" || c.Items[1].Run != `printf '%s' "hello"` {
 				t.Fatalf("unexpected config: %+v", c)
 			}
-			if retry == "" && c.Items[1].Retry != nil {
+			if retry == "" && (c.Items[1].Retry == nil || *c.Items[1].Retry != 3) {
 				t.Fatal("expected default retry")
 			}
 			if retry != "" && (c.Items[1].Retry == nil || strconv.Itoa(*c.Items[1].Retry) != retry) {
@@ -52,7 +52,7 @@ func TestAddItem(t *testing.T) {
 func TestAddItemDefaultRun(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	var output strings.Builder
-	if err := addItem(path, strings.NewReader("repo\nproject\n\n\n"), &output); err != nil {
+	if err := addItem(path, "", strings.NewReader("repo\nproject\n\n\n"), &output); err != nil {
 		t.Fatal(err)
 	}
 	c, err := readConfig(path)
@@ -105,7 +105,7 @@ func TestAddItemDoesNotOverwriteOnError(t *testing.T) {
 				}
 				defer lock.Close()
 			}
-			if err := addItem(path, strings.NewReader(tc.input), io.Discard); err == nil {
+			if err := addItem(path, "", strings.NewReader(tc.input), io.Discard); err == nil {
 				t.Fatal("expected error")
 			}
 			data, err := os.ReadFile(path)

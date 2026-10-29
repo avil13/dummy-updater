@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,7 +26,7 @@ func acquireConfigLock(path string) (*os.File, error) {
 	return lock, nil
 }
 
-func addItem(path string, input io.Reader, output io.Writer) error {
+func addItem(path, directory string, input io.Reader, output io.Writer) error {
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -48,24 +49,45 @@ func addItem(path string, input io.Reader, output io.Writer) error {
 		return strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r"), nil
 	}
 	const defaultRun = "docker compose up -d --build --remove-orphans"
-	var entry item
+	retryDefault := 3
+	entry := item{Run: defaultRun, Retry: &retryDefault}
+	if directory != "" {
+		entry.Target, err = filepath.Abs(directory)
+		if err != nil {
+			return err
+		}
+		if _, err := os.Stat(filepath.Join(entry.Target, ".git")); err != nil {
+			return fmt.Errorf("target is not a Git repository: %w", err)
+		}
+		entry.Repo, err = command(context.Background(), entry.Target, nil, "git", "remote", "get-url", "origin")
+		if err != nil {
+			return fmt.Errorf("read origin: %w", err)
+		}
+		if entry.Repo == "" {
+			return errors.New("origin must not be empty")
+		}
+	}
 	for _, field := range []struct {
 		prompt string
 		value  *string
 	}{
-		{"repo — repository URL: ", &entry.Repo},
-		{"target — project directory (relative to config): ", &entry.Target},
-		{"run — command [" + defaultRun + "]: ", &entry.Run},
+		{"repo — repository URL", &entry.Repo},
+		{"target — project directory (relative to config)", &entry.Target},
+		{"run — command", &entry.Run},
 	} {
-		*field.value, err = ask(field.prompt)
+		prompt := field.prompt
+		if *field.value != "" {
+			prompt += " [" + *field.value + "]"
+		}
+		value, err := ask(prompt + ": ")
 		if err != nil {
 			return err
 		}
+		if value != "" {
+			*field.value = value
+		}
 	}
-	if entry.Run == "" {
-		entry.Run = defaultRun
-	}
-	retry, err := ask("retry — additional attempts [2], 0 — no retries: ")
+	retry, err := ask("retry — additional attempts [3], 0 — no retries: ")
 	if err != nil {
 		return err
 	}

@@ -261,11 +261,11 @@ func main() {
 	}
 	path := flag.String("config", filepath.Join(filepath.Dir(executable), "config.json"), "path to config.json")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), `Usage: updater [add|stop] [-config path]
+		fmt.Fprintln(flag.CommandLine.Output(), `Usage: updater [-config path] [add [directory]|stop]
 
 Commands:
   (no command)  Update all repositories and execute their run commands.
-  add           Interactively add a project to the config.
+  add [directory]  Add a project; prefill target and origin from a local repo.
   stop          Select a project and stop its Docker Compose containers.
 
 Options:
@@ -275,6 +275,7 @@ Options:
 Examples:
   ./update.sh
   ./update.sh add
+  ./update.sh add ../path/to/repo
   ./update.sh stop
   ./update.sh stop -config /absolute/path/config.json`)
 	}
@@ -283,16 +284,25 @@ Examples:
 	if len(args) > 0 && (args[0] == "add" || args[0] == "stop") {
 		action, args = args[0], args[1:]
 	}
+	directory := ""
+	if action == "add" && len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		directory, args = args[0], args[1:]
+	}
 	if err := flag.CommandLine.Parse(args); err != nil {
 		log.Fatal(err)
 	}
-	if action == "" && flag.NArg() == 1 && (flag.Arg(0) == "add" || flag.Arg(0) == "stop") {
-		action = flag.Arg(0)
-	} else if flag.NArg() != 0 {
-		log.Fatal("usage: updater [add|stop] [-config path]")
+	rest := flag.Args()
+	if action == "" && len(rest) > 0 && (rest[0] == "add" || rest[0] == "stop") {
+		action, rest = rest[0], rest[1:]
+	}
+	if action == "add" && directory == "" && len(rest) == 1 {
+		directory, rest = rest[0], rest[1:]
+	}
+	if len(rest) != 0 {
+		log.Fatal("usage: updater [-config path] [add [directory]|stop]")
 	}
 	if action == "add" {
-		err = addItem(*path, os.Stdin, os.Stdout)
+		err = addItem(*path, directory, os.Stdin, os.Stdout)
 	} else {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
