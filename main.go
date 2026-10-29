@@ -260,25 +260,47 @@ func main() {
 		log.Fatal(err)
 	}
 	path := flag.String("config", filepath.Join(filepath.Dir(executable), "config.json"), "path to config.json")
+	flag.Usage = func() {
+		fmt.Fprintln(flag.CommandLine.Output(), `Usage: updater [add|stop] [-config path]
+
+Commands:
+  (no command)  Update all repositories and execute their run commands.
+  add           Interactively add a project to the config.
+  stop          Select a project and stop its Docker Compose containers.
+
+Options:
+  -h, --help    Show this help and exit.
+  -config path  Config file (default: config.json beside the binary).
+
+Examples:
+  ./update.sh
+  ./update.sh add
+  ./update.sh stop
+  ./update.sh stop -config /absolute/path/config.json`)
+	}
 	args := os.Args[1:]
-	add := len(args) > 0 && args[0] == "add"
-	if add {
-		args = args[1:]
+	action := ""
+	if len(args) > 0 && (args[0] == "add" || args[0] == "stop") {
+		action, args = args[0], args[1:]
 	}
 	if err := flag.CommandLine.Parse(args); err != nil {
 		log.Fatal(err)
 	}
-	if !add && flag.NArg() == 1 && flag.Arg(0) == "add" {
-		add = true
+	if action == "" && flag.NArg() == 1 && (flag.Arg(0) == "add" || flag.Arg(0) == "stop") {
+		action = flag.Arg(0)
 	} else if flag.NArg() != 0 {
-		log.Fatal("usage: updater [add] [-config path]")
+		log.Fatal("usage: updater [add|stop] [-config path]")
 	}
-	if add {
+	if action == "add" {
 		err = addItem(*path, os.Stdin, os.Stdout)
 	} else {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		err = run(ctx, *path)
+		if action == "stop" {
+			err = stopItem(ctx, *path, os.Stdin, os.Stdout)
+		} else {
+			err = run(ctx, *path)
+		}
 	}
 	if err != nil {
 		log.Print(err)
