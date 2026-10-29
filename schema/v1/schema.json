@@ -23,12 +23,19 @@
                 "max_err_mb": {
                     "$ref": "#/$defs/logLimit",
                     "default": 1,
-                    "description": "Maximum error.log size in decimal MB. Zero disables the file, not stderr."
+                    "description": "Maximum logs/error.log size in decimal MB. Zero disables the file, not stderr."
                 },
                 "max_project_mb": {
                     "$ref": "#/$defs/logLimit",
                     "default": 0.5,
-                    "description": "Maximum project-output log size in decimal MB. Zero disables these files."
+                    "description": "Maximum logs/project-output log size in decimal MB. Zero disables these files."
+                },
+                "retention_days": {
+                    "type": ["integer", "null"],
+                    "minimum": 0,
+                    "maximum": 9223372036854775807,
+                    "default": 7,
+                    "description": "Delete regular project-output-*.log files from logs/ after this many 24-hour days since last modification, at update or stop startup. Zero disables cleanup; null uses the default. error.log is not removed by age."
                 }
             }
         },

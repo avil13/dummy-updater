@@ -1,4 +1,5 @@
 *.log
+/logs/
 /config.json.lock
 
 config.json

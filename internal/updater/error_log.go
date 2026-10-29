@@ -3,8 +3,46 @@ package updater
 import (
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 )
+
+func prepareLogDir(configPath string, c config) (string, error) {
+	dir := filepath.Join(filepath.Dir(configPath), "logs")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return "", err
+	}
+	days := 7
+	if c.Log != nil && c.Log.RetentionDays != nil {
+		days = *c.Log.RetentionDays
+	}
+	if days == 0 {
+		return dir, nil
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", err
+	}
+	now := time.Now()
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.Name(), "project-output-") || !strings.HasSuffix(entry.Name(), ".log") {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return "", err
+		}
+		if !info.Mode().IsRegular() || now.Sub(info.ModTime())/(24*time.Hour) < time.Duration(days) {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, entry.Name())); err != nil {
+			return "", err
+		}
+	}
+	return dir, nil
+}
 
 type errorLog struct {
 	*os.File

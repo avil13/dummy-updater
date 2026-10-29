@@ -2,7 +2,8 @@
   "$schema": "https://raw.githubusercontent.com/avil13/dummy-updater/master/schema/v1/schema.json",
   "log": {
     "max_err_mb": 1,
-    "max_project_mb": 0.5
+    "max_project_mb": 0.5,
+    "retention_days": 7
   },
   "tg": {
     "enabled": false,

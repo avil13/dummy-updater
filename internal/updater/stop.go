@@ -26,6 +26,10 @@ func stopItem(ctx context.Context, path string, input io.Reader, output io.Write
 	if err != nil {
 		return err
 	}
+	logDir, err := prepareLogDir(path, c)
+	if err != nil {
+		return err
+	}
 	items := c.enabledItems()
 	if len(items) == 0 {
 		_, err := fmt.Fprintln(output, "No enabled projects")
@@ -68,7 +72,7 @@ func stopItem(ctx context.Context, path string, input io.Reader, output io.Write
 	}
 	entry := items[n-1]
 	errorLogLimit, _ := c.logLimits()
-	file, err := openErrorLog(filepath.Join(filepath.Dir(path), "error.log"), errorLogLimit)
+	file, err := openErrorLog(filepath.Join(logDir, "error.log"), errorLogLimit)
 	if err != nil {
 		return err
 	}

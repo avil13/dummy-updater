@@ -57,12 +57,16 @@ func TestRunProjectTranscripts(t *testing.T) {
 			if err := run(context.Background(), path); (err != nil) != fail {
 				t.Fatalf("run: %v", err)
 			}
-			logs, err := filepath.Glob(filepath.Join(dir, "project-output-*.log"))
+			info, err := os.Stat(filepath.Join(dir, "logs"))
+			if err != nil || info.Mode().Perm() != 0700 {
+				t.Fatalf("expected private logs directory: %v, err=%v", info, err)
+			}
+			logs, err := filepath.Glob(filepath.Join(dir, "logs", "project-output-*.log"))
 			if err != nil {
 				t.Fatal(err)
 			}
 			if tc.name == "disabled" {
-				if _, err := os.Stat(filepath.Join(dir, "error.log")); !os.IsNotExist(err) || len(logs) != 0 {
+				if _, err := os.Stat(filepath.Join(dir, "logs", "error.log")); !os.IsNotExist(err) || len(logs) != 0 {
 					t.Fatalf("disabled logs: files=%v, stat error=%v", logs, err)
 				}
 				data, err := os.ReadFile(console.Name())
