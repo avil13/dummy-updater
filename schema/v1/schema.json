@@ -1,0 +1,166 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/avil13/dummy-updater/master/schema/v1/schema.json",
+    "title": "dummi-updater configuration",
+    "description": "Trusted configuration for sequential Git updates and shell commands. Relative targets resolve against the config directory.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "items"
+    ],
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "description": "Editor schema URL; the updater does not fetch it."
+        },
+        "log": {
+            "type": [
+                "object",
+                "null"
+            ],
+            "additionalProperties": false,
+            "properties": {
+                "max_err_mb": {
+                    "$ref": "#/$defs/logLimit",
+                    "default": 1,
+                    "description": "Maximum error.log size in decimal MB. Zero disables the file, not stderr."
+                },
+                "max_project_mb": {
+                    "$ref": "#/$defs/logLimit",
+                    "default": 0.5,
+                    "description": "Maximum project-output log size in decimal MB. Zero disables these files."
+                }
+            }
+        },
+        "tg": {
+            "type": [
+                "object",
+                "null"
+            ],
+            "description": "Telegram settings. When omitted, TELEGRAM_* environment variables are used.",
+            "additionalProperties": false,
+            "properties": {
+                "enabled": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ],
+                    "default": false
+                },
+                "only_errors": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ],
+                    "default": false
+                },
+                "bot_token": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "description": "Telegram bot token. Keep it secret."
+                },
+                "chat_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "if": {
+                "type": "object",
+                "required": [
+                    "enabled"
+                ],
+                "properties": {
+                    "enabled": {
+                        "const": true
+                    }
+                }
+            },
+            "then": {
+                "required": [
+                    "bot_token",
+                    "chat_id"
+                ],
+                "properties": {
+                    "bot_token": {
+                        "$ref": "#/$defs/nonBlankString"
+                    },
+                    "chat_id": {
+                        "$ref": "#/$defs/nonBlankString"
+                    }
+                }
+            }
+        },
+        "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "repo",
+                    "target",
+                    "run"
+                ],
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                        "description": "Clone URL; no leading or trailing whitespace. Must exactly match origin for existing repositories."
+                    },
+                    "target": {
+                        "$ref": "#/$defs/nonBlankString",
+                        "description": "Project directory. Normalized targets must be unique; the CLI checks this."
+                    },
+                    "run": {
+                        "$ref": "#/$defs/nonBlankString",
+                        "description": "Trusted shell command executed via sh -c in the target directory."
+                    },
+                    "retry": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 9223372036854775807,
+                        "default": 2,
+                        "description": "Additional run attempts. Zero disables retries; null uses the default."
+                    },
+                    "enabled": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "default": true,
+                        "description": "False skips the project; null uses the default."
+                    }
+                }
+            }
+        }
+    },
+    "$defs": {
+        "nonBlankString": {
+            "type": "string",
+            "pattern": "\\S"
+        },
+        "logLimit": {
+            "description": "Decimal MB (1 MB = 1000000 bytes). Null uses the default; a positive limit must be at least one byte.",
+            "anyOf": [
+                {
+                    "type": "null"
+                },
+                {
+                    "const": 0
+                },
+                {
+                    "type": "number",
+                    "minimum": 0.000001,
+                    "exclusiveMaximum": 9223372036854.775
+                }
+            ]
+        }
+    }
+}

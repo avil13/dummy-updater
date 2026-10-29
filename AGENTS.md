@@ -20,6 +20,7 @@
 - Format changed Go files with `gofmt`.
 - Add focused regression tests for changed behavior. Use temporary directories and fake executables on `PATH`, following existing tests; do not require real Docker, remote repositories, or Telegram.
 - Update the README and example config when changing user-facing behavior or configuration.
+- Whenever config fields, types, defaults, required fields, or validation rules change, update `schema/v1/schema.json` in the same change. Keep the schema consistent with config validation, `config.example.json`, and the README.
 - Do not run `update.sh` or the updater against real targets as a test: they can pull repositories and execute deployment commands.
 
 ## Behavior to preserve

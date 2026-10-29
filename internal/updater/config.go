@@ -32,9 +32,10 @@ type logConfig struct {
 }
 
 type config struct {
-	Items []item          `json:"items"`
-	TG    *telegramConfig `json:"tg,omitempty"`
-	Log   *logConfig      `json:"log,omitempty"`
+	Schema string          `json:"$schema,omitempty"`
+	Items  []item          `json:"items"`
+	TG     *telegramConfig `json:"tg,omitempty"`
+	Log    *logConfig      `json:"log,omitempty"`
 }
 
 func (c config) logLimits() (errLimit, projectLimit int64) {
