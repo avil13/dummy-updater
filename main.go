@@ -206,7 +206,7 @@ func run(ctx context.Context, path string) error {
 	}
 	defer file.Close()
 	logger := log.New(os.Stdout, "", log.LstdFlags)
-	errorLogger := log.New(file, "", log.LstdFlags)
+	errorLogger := log.New(io.MultiWriter(file, os.Stderr), "", log.LstdFlags)
 	for _, name := range []string{"git", "docker"} {
 		if _, err := exec.LookPath(name); err != nil {
 			return err

@@ -22,6 +22,16 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"items":[{"repo":"repo","target":"project","run":"docker compose up -d"}]}`), 0600); err != nil {
 		t.Fatal(err)
 	}
+	console, err := os.CreateTemp(dir, "stderr-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stderr := os.Stderr
+	os.Stderr = console
+	t.Cleanup(func() {
+		os.Stderr = stderr
+		console.Close()
+	})
 	if err := run(context.Background(), path); err == nil {
 		t.Fatal("expected clone failure")
 	}
@@ -32,6 +42,13 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	if len(lines) != 1 || !strings.Contains(lines[0], "ERROR: clone:") {
 		t.Fatalf("expected only the clone error in log, got %q", data)
+	}
+	consoleData, err := os.ReadFile(console.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(consoleData) != string(data) || !strings.Contains(string(consoleData), "["+filepath.Join(dir, "project")+"]") {
+		t.Fatalf("expected the same error with project path in stderr, got %q", consoleData)
 	}
 }
 
