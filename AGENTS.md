@@ -29,7 +29,7 @@
 - Clone missing targets; require existing targets to be repositories with an exactly matching `origin`. Skip dirty repositories, including untracked files; use `git pull --ff-only` without discarding local work.
 - Execute trusted `run` commands via `sh -c` in the target, even without new commits. Default to two additional attempts; `retry: 0` disables retries. Do not retry Git operations; respect cancellation.
 - Process projects sequentially, continuing after individual failures and returning a failure exit status if any project fails.
-- Keep the per-config OS lock and error-only `error.log` beside the config, with errors also sent to stderr.
+- Keep the per-config OS lock beside the config and error-only `logs/error.log` in a `logs/` directory beside the config, with errors also sent to stderr. Retention cleanup must only delete expired regular `project-output-*.log` files inside that directory, never unrelated files, directories, or symlinks.
 - Treat configs and repositories as trusted executable input. Never commit credentials or expose Telegram tokens in logs.
 
 ## Verification

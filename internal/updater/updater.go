@@ -26,8 +26,12 @@ func run(ctx context.Context, path string) (runErr error) {
 	if err != nil {
 		return err
 	}
+	logDir, err := prepareLogDir(path, c)
+	if err != nil {
+		return err
+	}
 	errorLogLimit, outputLogLimit := c.logLimits()
-	file, err := openErrorLog(filepath.Join(filepath.Dir(path), "error.log"), errorLogLimit)
+	file, err := openErrorLog(filepath.Join(logDir, "error.log"), errorLogLimit)
 	if err != nil {
 		return err
 	}
@@ -112,7 +116,7 @@ func run(ctx context.Context, path string) (runErr error) {
 		var transcript *projectTranscript
 		var transcriptOutput = io.Discard
 		if outputLogLimit > 0 {
-			file, err := os.CreateTemp(filepath.Dir(path), "project-output-*.log")
+			file, err := os.CreateTemp(logDir, "project-output-*.log")
 			if err != nil {
 				return fmt.Errorf("create project output log: %w", err)
 			}
@@ -160,7 +164,7 @@ func run(ctx context.Context, path string) (runErr error) {
 		}
 		if updateErr != nil {
 			projectErrors[i] = true
-			statuses[i] = "❌ ошибка (подробности в error.log)"
+			statuses[i] = "❌ ошибка (подробности в logs/error.log)"
 			if errorLogLimit == 0 {
 				statuses[i] = "❌ ошибка (подробности в stderr)"
 			}

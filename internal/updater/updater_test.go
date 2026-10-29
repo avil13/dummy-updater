@@ -58,7 +58,7 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 		!strings.Contains(string(output), "Checking project\n") || strings.Contains(string(output), "\033[") {
 		t.Fatalf("expected separated project heading without colors in redirected output, got %q", output)
 	}
-	data, err := os.ReadFile(filepath.Join(dir, "error.log"))
+	data, err := os.ReadFile(filepath.Join(dir, "logs", "error.log"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 	if len(lines) != 1 || !strings.Contains(lines[0], "ERROR: clone:") {
 		t.Fatalf("expected only the clone error in log, got %q", data)
 	}
-	logs, err := filepath.Glob(filepath.Join(dir, "project-output-*.log"))
+	logs, err := filepath.Glob(filepath.Join(dir, "logs", "project-output-*.log"))
 	if err != nil || len(logs) != 1 {
 		t.Fatalf("expected failed project transcript, got %v, err=%v", logs, err)
 	}

@@ -83,7 +83,7 @@ func TestStopItem(t *testing.T) {
 			} else if !os.IsNotExist(err) {
 				t.Fatalf("unexpected Docker call: %q, %v", data, err)
 			}
-			logged, _ := os.ReadFile(filepath.Join(dir, "error.log"))
+			logged, _ := os.ReadFile(filepath.Join(dir, "logs", "error.log"))
 			if tc.fail {
 				if !strings.Contains(string(logged), "ERROR: stop: exit status 7") {
 					t.Fatalf("missing error log: %q", logged)

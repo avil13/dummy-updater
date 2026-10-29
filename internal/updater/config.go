@@ -27,8 +27,9 @@ type telegramConfig struct {
 }
 
 type logConfig struct {
-	MaxErrMB     *float64 `json:"max_err_mb,omitempty"`
-	MaxProjectMB *float64 `json:"max_project_mb,omitempty"`
+	MaxErrMB      *float64 `json:"max_err_mb,omitempty"`
+	MaxProjectMB  *float64 `json:"max_project_mb,omitempty"`
+	RetentionDays *int     `json:"retention_days,omitempty"`
 }
 
 type config struct {
@@ -86,6 +87,9 @@ func validateConfig(data []byte, path string) (config, error) {
 		return c, errors.New("tg: bot_token and chat_id are required when enabled")
 	}
 	if c.Log != nil {
+		if c.Log.RetentionDays != nil && *c.Log.RetentionDays < 0 {
+			return c, errors.New("log.retention_days: must be a non-negative integer")
+		}
 		for name, value := range map[string]*float64{"max_err_mb": c.Log.MaxErrMB, "max_project_mb": c.Log.MaxProjectMB} {
 			if value != nil && (*value < 0 || *value >= float64(1<<63)/1_000_000 || (*value > 0 && *value < 0.000001)) {
 				return c, fmt.Errorf("log.%s: must be zero or at least one byte and fit in int64", name)
