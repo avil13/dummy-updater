@@ -1,4 +1,4 @@
-package main
+package updater
 
 import (
 	"encoding/json"
@@ -130,7 +130,11 @@ func TestAddItemDoesNotOverwriteOnError(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer lock.Close()
+				defer func() {
+					if err := lock.Close(); err != nil {
+						t.Error(err)
+					}
+				}()
 			}
 			if err := addItem(path, "", strings.NewReader(tc.input), io.Discard); err == nil {
 				t.Fatal("expected error")

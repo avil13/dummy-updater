@@ -1,4 +1,4 @@
-package main
+package updater
 
 import (
 	"fmt"
@@ -18,7 +18,7 @@ type projectOutput struct {
 }
 
 func newProjectOutput(out io.Writer) *projectOutput {
-	fmt.Fprint(out, strings.Repeat("\n", 10))
+	_, _ = fmt.Fprint(out, strings.Repeat("\n", 10))
 	return &projectOutput{out: out}
 }
 
@@ -108,6 +108,6 @@ func (p *projectOutput) Write(data []byte) (int, error) {
 func (p *projectOutput) finish(target, icon string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	fmt.Fprint(p.out, "\033[11A\r\033[J")
-	fmt.Fprintf(p.out, "%s [%s]\n", icon, target)
+	_, _ = fmt.Fprint(p.out, "\033[11A\r\033[J")
+	_, _ = fmt.Fprintf(p.out, "%s [%s]\n", icon, target)
 }

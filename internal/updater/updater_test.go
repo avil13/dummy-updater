@@ -1,4 +1,4 @@
-package main
+package updater
 
 import (
 	"context"
@@ -35,13 +35,17 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 	os.Stdout = stdout
 	t.Cleanup(func() {
 		os.Stdout = originalStdout
-		stdout.Close()
+		if err := stdout.Close(); err != nil {
+			t.Error(err)
+		}
 	})
 	stderr := os.Stderr
 	os.Stderr = console
 	t.Cleanup(func() {
 		os.Stderr = stderr
-		console.Close()
+		if err := console.Close(); err != nil {
+			t.Error(err)
+		}
 	})
 	if err := run(context.Background(), path); err == nil {
 		t.Fatal("expected clone failure")
