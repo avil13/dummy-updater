@@ -67,7 +67,8 @@ func stopItem(ctx context.Context, path string, input io.Reader, output io.Write
 		return fmt.Errorf("select a project number from 1 to %d", len(items))
 	}
 	entry := items[n-1]
-	file, err := os.OpenFile(filepath.Join(filepath.Dir(path), "error.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	errorLogLimit, _ := c.logLimits()
+	file, err := openErrorLog(filepath.Join(filepath.Dir(path), "error.log"), errorLogLimit)
 	if err != nil {
 		return err
 	}

@@ -27,6 +27,16 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	stdout, err := os.CreateTemp(dir, "stdout-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalStdout := os.Stdout
+	os.Stdout = stdout
+	t.Cleanup(func() {
+		os.Stdout = originalStdout
+		stdout.Close()
+	})
 	stderr := os.Stderr
 	os.Stderr = console
 	t.Cleanup(func() {
@@ -36,6 +46,14 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 	if err := run(context.Background(), path); err == nil {
 		t.Fatal("expected clone failure")
 	}
+	output, err := os.ReadFile(stdout.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(output), "\n\n["+filepath.Join(dir, "project")+"] ") ||
+		!strings.Contains(string(output), "Checking project\n") || strings.Contains(string(output), "\033[") {
+		t.Fatalf("expected separated project heading without colors in redirected output, got %q", output)
+	}
 	data, err := os.ReadFile(filepath.Join(dir, "error.log"))
 	if err != nil {
 		t.Fatal(err)
@@ -43,6 +61,17 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	if len(lines) != 1 || !strings.Contains(lines[0], "ERROR: clone:") {
 		t.Fatalf("expected only the clone error in log, got %q", data)
+	}
+	logs, err := filepath.Glob(filepath.Join(dir, "project-output-*.log"))
+	if err != nil || len(logs) != 1 {
+		t.Fatalf("expected failed project transcript, got %v, err=%v", logs, err)
+	}
+	transcript, err := os.ReadFile(logs[0])
+	if err != nil || !strings.Contains(string(transcript), "Checking project\ncommand-output\n") || !strings.Contains(string(data), logs[0]) {
+		t.Fatalf("missing full output or log reference: %q, err=%v", transcript, err)
+	}
+	if !strings.Contains(string(output), "❌ ["+filepath.Join(dir, "project")+"]") {
+		t.Fatalf("missing failure summary: %q", output)
 	}
 	consoleData, err := os.ReadFile(console.Name())
 	if err != nil {

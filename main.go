@@ -35,9 +35,28 @@ type telegramConfig struct {
 	OnlyErrors bool   `json:"only_errors"`
 }
 
+type logConfig struct {
+	MaxErrMB     *float64 `json:"max_err_mb,omitempty"`
+	MaxProjectMB *float64 `json:"max_project_mb,omitempty"`
+}
+
 type config struct {
 	Items []item          `json:"items"`
 	TG    *telegramConfig `json:"tg,omitempty"`
+	Log   *logConfig      `json:"log,omitempty"`
+}
+
+func (c config) logLimits() (errLimit, projectLimit int64) {
+	errLimit, projectLimit = 1_000_000, 500_000
+	if c.Log != nil {
+		if c.Log.MaxErrMB != nil {
+			errLimit = int64(*c.Log.MaxErrMB * 1_000_000)
+		}
+		if c.Log.MaxProjectMB != nil {
+			projectLimit = int64(*c.Log.MaxProjectMB * 1_000_000)
+		}
+	}
+	return
 }
 
 func (c config) enabledItems() []item {
@@ -74,6 +93,13 @@ func validateConfig(data []byte, path string) (config, error) {
 	if c.TG != nil && c.TG.Enabled && (strings.TrimSpace(c.TG.BotToken) == "" || strings.TrimSpace(c.TG.ChatID) == "") {
 		return c, errors.New("tg: bot_token and chat_id are required when enabled")
 	}
+	if c.Log != nil {
+		for name, value := range map[string]*float64{"max_err_mb": c.Log.MaxErrMB, "max_project_mb": c.Log.MaxProjectMB} {
+			if value != nil && (*value < 0 || *value >= float64(1<<63)/1_000_000 || (*value > 0 && *value < 0.000001)) {
+				return c, fmt.Errorf("log.%s: must be zero or at least one byte and fit in int64", name)
+			}
+		}
+	}
 	seen := map[string]bool{}
 	for i := range c.Items {
 		entry := &c.Items[i]
@@ -103,23 +129,30 @@ func validateConfig(data []byte, path string) (config, error) {
 }
 
 func command(ctx context.Context, dir string, output io.Writer, name string, args ...string) (string, error) {
+	return commandStreams(ctx, dir, output, output, name, args...)
+}
+
+func commandStreams(ctx context.Context, dir string, output, stderr io.Writer, name string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	if output != nil {
-		cmd.Stdout = io.MultiWriter(output, &buf)
+		cmd.Stdout = output
 	}
 	cmd.Stderr = os.Stderr
-	if output != nil {
-		cmd.Stderr = output
+	if stderr != nil {
+		cmd.Stderr = stderr
 	}
 	err := cmd.Run()
 	return strings.TrimSpace(buf.String()), err
 }
 
 func update(ctx context.Context, entry item, output io.Writer, logger *log.Logger) (result string, err error) {
+	inspect := func(args ...string) (string, error) {
+		return commandStreams(ctx, entry.Target, nil, output, "git", args...)
+	}
 	cloned := false
 	if _, err := os.Stat(entry.Target); errors.Is(err, os.ErrNotExist) {
 		if err := os.MkdirAll(filepath.Dir(entry.Target), 0755); err != nil {
@@ -136,14 +169,14 @@ func update(ctx context.Context, entry item, output io.Writer, logger *log.Logge
 	if _, err := os.Stat(filepath.Join(entry.Target, ".git")); err != nil {
 		return "", fmt.Errorf("target is not a Git repository: %w", err)
 	}
-	remote, err := command(ctx, entry.Target, nil, "git", "remote", "get-url", "origin")
+	remote, err := inspect("remote", "get-url", "origin")
 	if err != nil {
 		return "", err
 	}
 	if remote != entry.Repo {
 		return "", errors.New("origin does not match configured repo")
 	}
-	status, err := command(ctx, entry.Target, nil, "git", "status", "--porcelain")
+	status, err := inspect("status", "--porcelain")
 	if err != nil {
 		return "", err
 	}
@@ -151,7 +184,7 @@ func update(ctx context.Context, entry item, output io.Writer, logger *log.Logge
 		logger.Print("WARNING: local changes; skipping")
 		return "⏭ локальные изменения", nil
 	}
-	before, err := command(ctx, entry.Target, nil, "git", "rev-parse", "HEAD")
+	before, err := inspect("rev-parse", "HEAD")
 	if err != nil {
 		return "", err
 	}
@@ -160,7 +193,7 @@ func update(ctx context.Context, entry item, output io.Writer, logger *log.Logge
 			return "", fmt.Errorf("pull: %w", err)
 		}
 	}
-	after, err := command(ctx, entry.Target, nil, "git", "rev-parse", "HEAD")
+	after, err := inspect("rev-parse", "HEAD")
 	if err != nil {
 		return "", err
 	}
@@ -250,12 +283,23 @@ func run(ctx context.Context, path string) (runErr error) {
 	if err != nil {
 		return err
 	}
-	file, err := os.OpenFile(filepath.Join(filepath.Dir(path), "error.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	errorLogLimit, outputLogLimit := c.logLimits()
+	file, err := openErrorLog(filepath.Join(filepath.Dir(path), "error.log"), errorLogLimit)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 	logger := log.New(os.Stdout, "", log.LstdFlags)
+	green, reset := "", ""
+	terminal := false
+	if os.Getenv("TERM") != "dumb" && os.Getenv("TERM") != "" {
+		if info, err := os.Stdout.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
+			terminal = true
+			if os.Getenv("NO_COLOR") == "" {
+				green, reset = "\033[32m", "\033[0m"
+			}
+		}
+	}
 	errorLogger := log.New(io.MultiWriter(file, os.Stderr), "", log.LstdFlags)
 	tg := c.TG
 	if tg == nil {
@@ -312,6 +356,9 @@ func run(ctx context.Context, path string) (runErr error) {
 			return err
 		}
 	}
+	if terminal {
+		fmt.Fprint(os.Stdout, "\n\n")
+	}
 	for i, entry := range c.Items {
 		if entry.Enabled != nil && !*entry.Enabled {
 			continue
@@ -319,16 +366,72 @@ func run(ctx context.Context, path string) (runErr error) {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		var transcript *projectTranscript
+		var transcriptOutput io.Writer = io.Discard
+		if outputLogLimit > 0 {
+			file, err := os.CreateTemp(filepath.Dir(path), "project-output-*.log")
+			if err != nil {
+				return fmt.Errorf("create project output log: %w", err)
+			}
+			transcript = &projectTranscript{File: file, limit: outputLogLimit}
+			transcriptOutput = transcript
+		}
+		var display io.Writer = os.Stdout
+		var progress *projectOutput
+		if terminal {
+			fmt.Fprint(os.Stdout, "\033[?7l")
+			log.New(os.Stdout, "["+green+entry.Target+reset+"] ", log.LstdFlags).Print("Checking project")
+			fmt.Fprint(os.Stdout, "\033[?7h")
+			progress = newProjectOutput(os.Stdout)
+			display = progress
+		} else {
+			fmt.Fprint(os.Stdout, "\n\n")
+		}
+		output := io.MultiWriter(transcriptOutput, display)
+		logger.SetOutput(output)
 		logger.SetPrefix("[" + entry.Target + "] ")
-		logger.Print("Checking project")
-		status, err := update(ctx, entry, os.Stdout, logger)
+		if terminal {
+			log.New(transcriptOutput, "["+entry.Target+"] ", log.LstdFlags).Print("Checking project")
+		} else {
+			logger.Print("Checking project")
+		}
+		status, updateErr := update(ctx, entry, output, logger)
+		if transcript != nil {
+			if closeErr := transcript.Close(); closeErr != nil {
+				updateErr = errors.Join(updateErr, fmt.Errorf("save project output: %w", closeErr))
+			}
+		}
+		logger.SetOutput(os.Stdout)
 		statuses[i] = status
-		if err != nil {
+		icon := "✅"
+		if strings.HasPrefix(status, "⏭") {
+			icon = "⏭"
+		}
+		if updateErr != nil {
+			icon = "❌"
+		}
+		if progress != nil {
+			progress.finish(green+entry.Target+reset, icon)
+		} else {
+			fmt.Fprintf(os.Stdout, "%s [%s]\n", icon, entry.Target)
+		}
+		if updateErr != nil {
 			projectErrors[i] = true
 			statuses[i] = "❌ ошибка (подробности в error.log)"
+			if errorLogLimit == 0 {
+				statuses[i] = "❌ ошибка (подробности в stderr)"
+			}
 			errorLogger.SetPrefix("[" + entry.Target + "] ")
-			errorLogger.Printf("ERROR: %v", err)
+			logPath := ""
+			if transcript != nil {
+				logPath = "; output: " + transcript.Name()
+			}
+			errorLogger.Printf("ERROR: %v%s", updateErr, logPath)
 			failed = true
+		} else if transcript != nil {
+			if err := os.Remove(transcript.Name()); err != nil {
+				return fmt.Errorf("remove successful project output log: %w", err)
+			}
 		}
 	}
 	if failed {
