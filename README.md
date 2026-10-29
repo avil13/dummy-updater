@@ -33,6 +33,7 @@
 
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/avil13/dummy-updater/master/schema/v1/schema.json",
   "log": {
     "max_err_mb": 1,
     "max_project_mb": 0.5
@@ -54,6 +55,12 @@
   ]
 }
 ```
+
+Поле `$schema` подключает [JSON Schema](schema/v1/schema.json) для подсказок
+и проверки конфига в редакторе. CLI принимает это поле, не скачивает схему
+и сохраняет ссылку при `add`. Проверку уникальности нормализованных target
+и состояния репозиториев по-прежнему выполняет CLI.
+Ссылка на GitHub станет доступна после публикации схемы в ветке `master`.
 
 Замените URL и пути своими значениями. Ключ называется `repo`, без двоеточия.
 На macOS используйте доступные вам пути, например `/Users/your-user/projects/backend`.
