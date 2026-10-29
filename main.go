@@ -214,19 +214,15 @@ func run(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	c, err := readConfig(path)
-	if err != nil {
-		return err
-	}
-	lock, err := os.OpenFile(path+".lock", os.O_CREATE|os.O_RDWR, 0600)
+	lock, err := acquireConfigLock(path)
 	if err != nil {
 		return err
 	}
 	defer lock.Close()
-	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		return fmt.Errorf("cannot acquire update lock (another updater may be running): %w", err)
+	c, err := readConfig(path)
+	if err != nil {
+		return err
 	}
-	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
 	file, err := os.OpenFile(filepath.Join(filepath.Dir(path), "error.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
@@ -264,10 +260,27 @@ func main() {
 		log.Fatal(err)
 	}
 	path := flag.String("config", filepath.Join(filepath.Dir(executable), "config.json"), "path to config.json")
-	flag.Parse()
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	if err := run(ctx, *path); err != nil {
+	args := os.Args[1:]
+	add := len(args) > 0 && args[0] == "add"
+	if add {
+		args = args[1:]
+	}
+	if err := flag.CommandLine.Parse(args); err != nil {
+		log.Fatal(err)
+	}
+	if !add && flag.NArg() == 1 && flag.Arg(0) == "add" {
+		add = true
+	} else if flag.NArg() != 0 {
+		log.Fatal("usage: updater [add] [-config path]")
+	}
+	if add {
+		err = addItem(*path, os.Stdin, os.Stdout)
+	} else {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		err = run(ctx, *path)
+	}
+	if err != nil {
 		log.Print(err)
 		os.Exit(1)
 	}
