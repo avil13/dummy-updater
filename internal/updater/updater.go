@@ -48,10 +48,7 @@ func run(ctx context.Context, path string) (runErr error) {
 		}
 	}
 	errorLogger := log.New(io.MultiWriter(file, os.Stderr), "", log.LstdFlags)
-	tg := c.TG
-	if tg == nil {
-		tg = &telegramConfig{Enabled: os.Getenv("TELEGRAM_ENABLED") == "true", BotToken: os.Getenv("TELEGRAM_BOT_TOKEN"), ChatID: os.Getenv("TELEGRAM_CHAT_ID")}
-	}
+	tg := resolveTelegram(c.TG)
 	statuses := make([]string, len(c.Items))
 	projectErrors := make([]bool, len(c.Items))
 	failed := false
@@ -84,13 +81,13 @@ func run(ctx context.Context, path string) (runErr error) {
 				line = string([]rune(line)[:3500]) + "…"
 			}
 			if len([]rune(message+line)) > 4000 {
-				notify(context.WithoutCancel(ctx), *tg, message, logger)
+				notify(context.WithoutCancel(ctx), tg, message, logger)
 				message = "Отчёт updater (продолжение)"
 			}
 			message += line
 		}
 		if hasReport {
-			notify(context.WithoutCancel(ctx), *tg, message, logger)
+			notify(context.WithoutCancel(ctx), tg, message, logger)
 		}
 	}()
 	items := c.enabledItems()
@@ -113,6 +110,14 @@ func run(ctx context.Context, path string) (runErr error) {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		diskWarningSent := false
+		checkDisk := func() {
+			if c.Log != nil && c.Log.FreeSize != nil && !diskWarningSent {
+				threshold, _ := parseFreeSize(*c.Log.FreeSize) // Already validated by readConfig.
+				diskWarningSent = checkFreeSpace(ctx, entry.Target, threshold, tg, logger)
+			}
+		}
+		checkDisk()
 		var transcript *projectTranscript
 		var transcriptOutput = io.Discard
 		if outputLogLimit > 0 {
@@ -180,6 +185,7 @@ func run(ctx context.Context, path string) (runErr error) {
 				return fmt.Errorf("remove successful project output log: %w", err)
 			}
 		}
+		checkDisk()
 	}
 	if failed {
 		return errors.New("one or more projects failed to update")

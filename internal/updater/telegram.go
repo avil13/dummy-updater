@@ -7,9 +7,26 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
+
+func resolveTelegram(settings *telegramConfig) telegramConfig {
+	var tg telegramConfig
+	if settings == nil {
+		tg.Enabled = os.Getenv("TELEGRAM_ENABLED") == "true"
+	} else {
+		tg = *settings
+	}
+	if strings.TrimSpace(tg.BotToken) == "" {
+		tg.BotToken = os.Getenv("TELEGRAM_BOT_TOKEN")
+	}
+	if strings.TrimSpace(tg.ChatID) == "" {
+		tg.ChatID = os.Getenv("TELEGRAM_CHAT_ID")
+	}
+	return tg
+}
 
 func notify(ctx context.Context, tg telegramConfig, message string, logger *log.Logger) {
 	if !tg.Enabled {

@@ -129,6 +129,31 @@ func addItem(path, directory string, input io.Reader, output io.Writer) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
+	if c.Schema == "" {
+		c.Schema = "https://raw.githubusercontent.com/avil13/dummy-updater/master/schema/v1/schema.json"
+	}
+	if c.Log == nil {
+		c.Log = &logConfig{}
+	}
+	if c.Log.MaxErrMB == nil {
+		value := 1.0
+		c.Log.MaxErrMB = &value
+	}
+	if c.Log.MaxProjectMB == nil {
+		value := 0.5
+		c.Log.MaxProjectMB = &value
+	}
+	if c.Log.RetentionDays == nil {
+		value := 7
+		c.Log.RetentionDays = &value
+	}
+	if c.Log.FreeSize == nil {
+		value := "10%"
+		c.Log.FreeSize = &value
+	}
+	if c.TG == nil {
+		c.TG = &telegramConfig{}
+	}
 	c.Items = append(c.Items, entry)
 	data, err = json.MarshalIndent(c, "", "  ")
 	if err != nil {

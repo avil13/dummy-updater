@@ -27,6 +27,7 @@ type telegramConfig struct {
 }
 
 type logConfig struct {
+	FreeSize      *string  `json:"free_size,omitempty"`
 	MaxErrMB      *float64 `json:"max_err_mb,omitempty"`
 	MaxProjectMB  *float64 `json:"max_project_mb,omitempty"`
 	RetentionDays *int     `json:"retention_days,omitempty"`
@@ -83,10 +84,16 @@ func validateConfig(data []byte, path string) (config, error) {
 	if len(c.Items) == 0 {
 		return c, errors.New("items must not be empty")
 	}
-	if c.TG != nil && c.TG.Enabled && (strings.TrimSpace(c.TG.BotToken) == "" || strings.TrimSpace(c.TG.ChatID) == "") {
-		return c, errors.New("tg: bot_token and chat_id are required when enabled")
+	tg := resolveTelegram(c.TG)
+	if c.TG != nil && tg.Enabled && (strings.TrimSpace(tg.BotToken) == "" || strings.TrimSpace(tg.ChatID) == "") {
+		return c, errors.New("tg: bot_token and chat_id are required in config or environment when enabled")
 	}
 	if c.Log != nil {
+		if c.Log.FreeSize != nil {
+			if _, err := parseFreeSize(*c.Log.FreeSize); err != nil {
+				return c, err
+			}
+		}
 		if c.Log.RetentionDays != nil && *c.Log.RetentionDays < 0 {
 			return c, errors.New("log.retention_days: must be a non-negative integer")
 		}

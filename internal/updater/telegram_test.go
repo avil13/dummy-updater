@@ -18,6 +18,8 @@ type telegramTransport func(*http.Request) (*http.Response, error)
 func (f telegramTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestTelegramConfig(t *testing.T) {
+	t.Setenv("TELEGRAM_BOT_TOKEN", "")
+	t.Setenv("TELEGRAM_CHAT_ID", "")
 	for _, tc := range []struct {
 		tg    string
 		valid bool
@@ -33,6 +35,41 @@ func TestTelegramConfig(t *testing.T) {
 		if (err == nil) != tc.valid {
 			t.Fatalf("tg=%s: %v", tc.tg, err)
 		}
+	}
+}
+
+func TestTelegramEnvironmentFallback(t *testing.T) {
+	t.Setenv("TELEGRAM_ENABLED", "true")
+	t.Setenv("TELEGRAM_BOT_TOKEN", "env-token")
+	t.Setenv("TELEGRAM_CHAT_ID", "env-chat")
+	for _, tc := range []struct {
+		settings    string
+		enabled     bool
+		token, chat string
+	}{
+		{`null`, true, "env-token", "env-chat"},
+		{`{"enabled":true}`, true, "env-token", "env-chat"},
+		{`{"enabled":true,"bot_token":"","chat_id":" \t"}`, true, "env-token", "env-chat"},
+		{`{"enabled":true,"bot_token":"config-token"}`, true, "config-token", "env-chat"},
+		{`{"enabled":true,"chat_id":"config-chat"}`, true, "env-token", "config-chat"},
+		{`{"enabled":false}`, false, "env-token", "env-chat"},
+		{`{}`, false, "env-token", "env-chat"},
+	} {
+		c, err := validateConfig([]byte(`{"tg":`+tc.settings+`,"items":[{"repo":"repo","target":"project","run":"true"}]}`), "config.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := resolveTelegram(c.TG)
+		if got.Enabled != tc.enabled || got.BotToken != tc.token || got.ChatID != tc.chat {
+			t.Fatalf("incorrect fallback for %s", tc.settings)
+		}
+		if c.TG != nil && (c.TG.BotToken == "env-token" || c.TG.ChatID == "env-chat") {
+			t.Fatal("environment credentials must not be copied into the stored config")
+		}
+	}
+	t.Setenv("TELEGRAM_BOT_TOKEN", " ")
+	if _, err := validateConfig([]byte(`{"tg":{"enabled":true},"items":[{"repo":"repo","target":"project","run":"true"}]}`), "config.json"); err == nil {
+		t.Fatal("blank credentials in both config and environment must be rejected")
 	}
 }
 
@@ -112,6 +149,8 @@ func TestTelegramSummary(t *testing.T) {
 	if calls != 1 {
 		t.Fatalf("expected one report, got %d", calls)
 	}
+	t.Setenv("TELEGRAM_BOT_TOKEN", "secret")
+	c.TG.BotToken = " "
 	c.TG.OnlyErrors = true
 	c.TG.ChatID = "@alerts"
 	save := func() {

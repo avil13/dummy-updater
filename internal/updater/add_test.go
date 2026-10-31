@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -47,6 +48,59 @@ func TestAddItem(t *testing.T) {
 			info, err := os.Stat(path)
 			if err != nil || info.Mode().Perm() != 0600 {
 				t.Fatalf("expected private config, info=%v, err=%v", info, err)
+			}
+		})
+	}
+}
+
+func TestAddItemConfigDefaults(t *testing.T) {
+	for _, tc := range []struct {
+		name, settings, wantLog, wantTG string
+	}{
+		{"new config", "", `{"max_err_mb":1,"max_project_mb":0.5,"retention_days":7,"free_size":"10%"}`, `{}`},
+		{"missing settings", `{}`, `{"max_err_mb":1,"max_project_mb":0.5,"retention_days":7,"free_size":"10%"}`, `{}`},
+		{"partial settings", `{"log":{"max_err_mb":0},"tg":{"only_errors":true}}`, `{"max_err_mb":0,"max_project_mb":0.5,"retention_days":7,"free_size":"10%"}`, `{"only_errors":true}`},
+		{"null settings", `{"log":null,"tg":null}`, `{"max_err_mb":1,"max_project_mb":0.5,"retention_days":7,"free_size":"10%"}`, `{}`},
+		{"custom settings", `{"$schema":"custom","log":{"max_err_mb":2,"max_project_mb":0,"retention_days":0,"free_size":"0%"},"tg":{"enabled":true,"only_errors":true,"bot_token":"test-token","chat_id":"123"}}`, `{"max_err_mb":2,"max_project_mb":0,"retention_days":0,"free_size":"0%"}`, `{"enabled":true,"only_errors":true,"bot_token":"test-token","chat_id":"123"}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			var original config
+			if tc.settings != "" {
+				if err := json.Unmarshal([]byte(tc.settings), &original); err != nil {
+					t.Fatal(err)
+				}
+				original.Items = []item{{Repo: "old", Target: "old", Run: "true"}}
+				data, err := json.Marshal(original)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, data, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := addItem(path, "", strings.NewReader("repo\nnew\n\n\n\n"), io.Discard); err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got, want config
+			if err := json.Unmarshal(data, &got); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal([]byte(`{"log":`+tc.wantLog+`,"tg":`+tc.wantTG+`}`), &want); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got.Log, want.Log) || !reflect.DeepEqual(got.TG, want.TG) {
+				t.Fatalf("unexpected defaults: %s", data)
+			}
+			if original.Schema != "" && got.Schema != original.Schema || got.Schema == "" {
+				t.Fatalf("unexpected schema: %q", got.Schema)
+			}
+			if !reflect.DeepEqual(got.Items[:len(original.Items)], original.Items) && len(original.Items) > 0 {
+				t.Fatal("existing items changed")
 			}
 		})
 	}
