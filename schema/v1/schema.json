@@ -11,7 +11,7 @@
     "properties": {
         "$schema": {
             "type": "string",
-            "description": "Editor schema URL; the updater does not fetch it."
+            "description": "Editor schema URL; the updater does not fetch it. The add command fills a missing or empty URL with the schema URL from the example config."
         },
         "log": {
             "type": [
@@ -20,6 +20,11 @@
             ],
             "additionalProperties": false,
             "properties": {
+                "free_size": {
+                    "type": ["string", "null"],
+                    "pattern": "^(100|[1-9]?[0-9])%$",
+                    "description": "Warn when disk space available to the current user on each target filesystem is below this percentage. Missing targets use the nearest existing parent directory. Checked before and after each enabled project; at most one warning per target per run, including Telegram when enabled, regardless of only_errors. Missing or null disables the check; 0% never warns. The add command fills missing or null free_size with 10%. Updates continue."
+                },
                 "max_err_mb": {
                     "$ref": "#/$defs/logLimit",
                     "default": 1,
@@ -44,7 +49,7 @@
                 "object",
                 "null"
             ],
-            "description": "Telegram settings. When omitted, TELEGRAM_* environment variables are used.",
+            "description": "Telegram settings. When omitted, TELEGRAM_* environment variables are used. Blank, null or missing bot_token and chat_id fall back independently to TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID. Explicit enabled false always disables notifications. When enabled, credentials must be nonblank after environment fallback; the CLI validates this because JSON Schema cannot inspect environment variables. The add command fills missing or null settings with an explicit disabled block (enabled and only_errors false, bot_token and chat_id empty).",
             "additionalProperties": false,
             "properties": {
                 "enabled": {
@@ -73,31 +78,6 @@
                         "string",
                         "null"
                     ]
-                }
-            },
-            "if": {
-                "type": "object",
-                "required": [
-                    "enabled"
-                ],
-                "properties": {
-                    "enabled": {
-                        "const": true
-                    }
-                }
-            },
-            "then": {
-                "required": [
-                    "bot_token",
-                    "chat_id"
-                ],
-                "properties": {
-                    "bot_token": {
-                        "$ref": "#/$defs/nonBlankString"
-                    },
-                    "chat_id": {
-                        "$ref": "#/$defs/nonBlankString"
-                    }
                 }
             }
         },

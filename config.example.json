@@ -3,7 +3,8 @@
   "log": {
     "max_err_mb": 1,
     "max_project_mb": 0.5,
-    "retention_days": 7
+    "retention_days": 7,
+    "free_size": "10%"
   },
   "tg": {
     "enabled": false,
