@@ -136,6 +136,13 @@ func TestTelegramSummary(t *testing.T) {
 				}
 			}
 		}
+		wantDisks := len(c.Items)
+		if c.TG.OnlyErrors {
+			wantDisks = 1
+		}
+		if strings.Count(message, "💾 свободно ") != wantDisks || strings.Count(message, " ГБ (") != wantDisks {
+			t.Errorf("expected disk space for each reported target: %s", message)
+		}
 		for _, status := range expected {
 			if !strings.Contains(message, status) {
 				t.Errorf("missing %q in %q", status, message)

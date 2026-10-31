@@ -35,6 +35,16 @@ func targetDiskStats(path string) (syscall.Statfs_t, error) {
 	}
 }
 
+func diskSpaceSummary(path string) string {
+	stat, err := targetDiskStats(path)
+	if err != nil || stat.Blocks == 0 {
+		return "💾 свободное место: не удалось определить"
+	}
+	freeGB := float64(stat.Bavail) * float64(stat.Bsize) / 1_000_000_000
+	percent := float64(stat.Bavail) / float64(stat.Blocks) * 100
+	return fmt.Sprintf("💾 свободно %.2f ГБ (%.2f%%)", freeGB, percent)
+}
+
 func checkFreeSpace(ctx context.Context, path string, threshold int, tg telegramConfig, logger *log.Logger) bool {
 	stat, err := targetDiskStats(path)
 	if err != nil {

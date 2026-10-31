@@ -75,7 +75,7 @@ func run(ctx context.Context, path string) (runErr error) {
 				continue
 			}
 			hasReport = true
-			line := "\n" + entry.Target + ": " + statuses[i]
+			line := "\n" + entry.Target + ": " + statuses[i] + "\n  " + diskSpaceSummary(entry.Target)
 			// Keep each message below Telegram’s 4096-character limit.
 			if len([]rune(line)) > 3500 {
 				line = string([]rune(line)[:3500]) + "…"

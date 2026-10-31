@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -60,6 +61,23 @@ func TestTargetDiskStats(t *testing.T) {
 	got, err = targetDiskStats(link)
 	if err != nil || got.Fsid != want.Fsid {
 		t.Fatalf("target symlink must resolve to its filesystem: %+v, %v", got, err)
+	}
+}
+
+func TestDiskSpaceSummary(t *testing.T) {
+	dir := t.TempDir()
+	for _, path := range []string{dir, filepath.Join(dir, "missing", "target")} {
+		got := diskSpaceSummary(path)
+		if !regexp.MustCompile(`^💾 свободно [0-9]+\.[0-9]{2} ГБ \([0-9]+\.[0-9]{2}%\)$`).MatchString(got) {
+			t.Fatalf("unexpected disk space summary: %s", got)
+		}
+	}
+	file := filepath.Join(dir, "file")
+	if err := os.WriteFile(file, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if got := diskSpaceSummary(filepath.Join(file, "target")); got != "💾 свободное место: не удалось определить" {
+		t.Fatalf("unexpected stat error summary: %s", got)
 	}
 }
 
