@@ -11,7 +11,7 @@ case "$(uname -m)" in
   aarch64|arm64) ARCH=arm64 ;;
   *) echo "Unsupported architecture" >&2; exit 1 ;;
 esac
-if [[ "${1:-}" == add || "${1:-}" == stop ]]; then
+if [[ "${1:-}" == add || "${1:-}" == stop || "${1:-}" == ls ]]; then
   ACTION="$1"
   shift
   exec "$ROOT/dist/updater-$OS-$ARCH" "$ACTION" -config "$ROOT/config.json" "$@"

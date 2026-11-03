@@ -74,8 +74,8 @@ func TestRunProjectTranscripts(t *testing.T) {
 					t.Fatalf("missing stderr error with logs disabled: %q, %v", data, err)
 				}
 			} else if fail {
-				if len(logs) != 1 {
-					t.Fatalf("missing transcript: %v", logs)
+				if len(logs) != 1 || !strings.HasPrefix(filepath.Base(logs[0]), projectLogPrefix(filepath.Join(dir, "project"))) {
+					t.Fatalf("missing project-tagged transcript: %v", logs)
 				}
 				data, err := os.ReadFile(logs[0])
 				if err != nil || !strings.Contains(string(data), "inspection-stderr") {

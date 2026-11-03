@@ -12,7 +12,12 @@ import (
 	"strings"
 )
 
-func run(ctx context.Context, path string) (runErr error) {
+func run(ctx context.Context, path string) error {
+	return runSelected(ctx, path, "")
+}
+
+// An empty target runs all projects; selection is resolved under the config lock.
+func runSelected(ctx context.Context, path, target string) (runErr error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -25,6 +30,21 @@ func run(ctx context.Context, path string) (runErr error) {
 	c, err := readConfig(path)
 	if err != nil {
 		return err
+	}
+	if target != "" {
+		var selected []item
+		for _, entry := range c.Items {
+			if entry.Target == target {
+				selected = append(selected, entry)
+			}
+		}
+		if len(selected) == 0 {
+			return fmt.Errorf("project no longer exists in config: %s", target)
+		}
+		if selected[0].Enabled != nil && !*selected[0].Enabled {
+			return errors.New("project is disabled; set enabled to true before running")
+		}
+		c.Items = selected
 	}
 	logDir, err := prepareLogDir(path, c)
 	if err != nil {
@@ -121,7 +141,7 @@ func run(ctx context.Context, path string) (runErr error) {
 		var transcript *projectTranscript
 		var transcriptOutput = io.Discard
 		if outputLogLimit > 0 {
-			file, err := os.CreateTemp(logDir, "project-output-*.log")
+			file, err := os.CreateTemp(logDir, projectLogPrefix(entry.Target)+"*.log")
 			if err != nil {
 				return fmt.Errorf("create project output log: %w", err)
 			}

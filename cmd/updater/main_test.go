@@ -12,7 +12,7 @@ func TestCLIHelp(t *testing.T) {
 	if output, err := exec.Command("go", "build", "-o", binary, ".").CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, output)
 	}
-	for _, action := range []string{"", "add", "stop"} {
+	for _, action := range []string{"", "add", "stop", "ls"} {
 		for _, help := range []string{"-h", "--help"} {
 			t.Run(action+help, func(t *testing.T) {
 				args := []string{"-config", filepath.Join(t.TempDir(), "missing.json"), help}
@@ -23,7 +23,7 @@ func TestCLIHelp(t *testing.T) {
 				if err != nil {
 					t.Fatalf("help: %v\n%s", err, output)
 				}
-				for _, want := range []string{"Usage:", "add", "stop", "-config", "-h, --help"} {
+				for _, want := range []string{"Usage:", "add", "stop", "ls", "-config", "-h, --help"} {
 					if !strings.Contains(string(output), want) {
 						t.Errorf("help missing %q: %s", want, output)
 					}

@@ -162,6 +162,14 @@ func addItem(path, directory string, input io.Reader, output io.Writer) error {
 	if _, err := validateConfig(data, path); err != nil {
 		return err
 	}
+	if err := writeConfig(path, data); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(output, "%sProject added to %s%s\n", green, path, reset)
+	return err
+}
+
+func writeConfig(path string, data []byte) error {
 	// Replace atomically so an interrupted write cannot truncate the config.
 	file, err := os.CreateTemp(filepath.Dir(path), ".config-*")
 	if err != nil {
@@ -178,6 +186,5 @@ func addItem(path, directory string, input io.Reader, output io.Writer) error {
 	if err := os.Rename(file.Name(), path); err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(output, "%sProject added to %s%s\n", green, path, reset)
-	return err
+	return nil
 }
