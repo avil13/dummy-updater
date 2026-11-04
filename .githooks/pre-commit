@@ -33,6 +33,5 @@ cd "$ROOT"
 for OS in linux darwin; do
   for ARCH in amd64 arm64; do
     cp "$TMP/updater-$OS-$ARCH" "dist/updater-$OS-$ARCH"
-    git add -- "dist/updater-$OS-$ARCH"
   done
 done

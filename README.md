@@ -11,6 +11,9 @@ Sequentially updates Git repositories and executes the command from the required
 - A Compose file in the root of each target repository.
 - Go 1.22+ only for building and pre-commit; not needed for prebuilt binaries.
 
+Binaries in `dist/` are not tracked in Git. After cloning, follow [Manual build](#manual-build)
+before running `update.sh` or a binary.
+
 ## Configuration
 
 1. Add a project with `./update.sh add` or fill in `config.json` manually:
@@ -383,7 +386,8 @@ On commit, the hook first runs `golangci-lint run --fix` in the working director
 If Go files change, the commit is stopped: review the changes, stage them, and retry.
 The hook does not stage fixed source files automatically. Lint errors also block the commit.
 If there are no fixes, the hook tests the **staged** source snapshot and builds
-all four `dist/updater-{linux,darwin}-{amd64,arm64}` binaries, then stages them for the commit.
+all four `dist/updater-{linux,darwin}-{amd64,arm64}` binaries locally.
+The binaries are ignored by Git and are not staged for the commit.
 Before the first commit, stage the source files.
 Neither the tests nor the hook run Docker.
 
