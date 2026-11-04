@@ -82,7 +82,13 @@ func update(ctx context.Context, entry item, output io.Writer, logger *log.Logge
 	if err != nil {
 		return "", err
 	}
-	// Run even without new commits so a failed deployment is retried next time.
+	if !cloned && before == after && composeHealthy(ctx, entry.Target, output) {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+		logger.Printf("SUCCESS: %s unchanged; Compose healthy, skipping run", after)
+		return "✅ без новых коммитов, Compose работает, run пропущен", nil
+	}
 	// The trusted config intentionally supplies a shell command.
 	retry := 2
 	if entry.Retry != nil {
