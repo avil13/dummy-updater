@@ -2,7 +2,7 @@
 
 ## Project
 
-`dummi-updater` is a Go 1.22 CLI that sequentially updates Git repositories and runs a configured shell command in each target. Supported platforms are Linux and macOS, on amd64 and arm64. It currently uses only the Go standard library.
+`dummi-updater` is a Go 1.27 CLI that sequentially updates Git repositories and runs a configured shell command in each target. Supported platforms are Linux and macOS, on amd64 and arm64. It currently uses only the Go standard library.
 
 ## Layout
 

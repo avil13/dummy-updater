@@ -9,10 +9,19 @@ Sequentially updates Git repositories and executes the command from the required
 - Git and repository access via SSH keys or a credential helper.
 - Docker running and the `docker compose` command available.
 - A Compose file in the root of each target repository.
-- Go 1.22+ only for building and pre-commit; not needed for prebuilt binaries.
+- Go 1.27+ only for building and pre-commit; not needed for prebuilt binaries.
 
-Binaries in `dist/` are not tracked in Git. After cloning, follow [Manual build](#manual-build)
-before running `update.sh` or a binary.
+Binaries in `dist/` are not tracked in Git. After cloning, download the binary for your
+platform from [GitHub Releases](https://github.com/avil13/dummy-updater/releases)
+into `dist/` and make it executable, for example:
+
+```sh
+mkdir -p dist
+# Save the downloaded updater-linux-amd64 file into dist/ first.
+chmod +x dist/updater-linux-amd64
+```
+
+Alternatively, follow [Manual build](#manual-build) before running `update.sh` or a binary.
 
 ## Configuration
 
@@ -376,7 +385,7 @@ for compatibility; these also enable the final report instead of individual noti
 
 ## Building and pre-commit
 
-Go 1.22+ and `golangci-lint` on `PATH` are required. Enable the hook in each new clone:
+Go 1.27+ and `golangci-lint` on `PATH` are required. Enable the hook in each new clone:
 
 ```sh
 git config core.hooksPath .githooks
@@ -403,6 +412,33 @@ Current tests cover JSON reading and validation, executing `run` in the target
 navigation in `ls`, selective execution, log filtering, and error-only logging;
 they do not run Docker.
 Check Compose behavior separately in your own environment.
+
+## GitHub Releases
+
+Push a version tag to run `.github/workflows/release.yml`:
+
+```sh
+git tag -a v1.0.0 -m "Release v1.0.0"
+git push origin v1.0.0
+```
+
+The workflow tests and vets the tagged source, then builds Linux and macOS binaries
+for amd64 and arm64 with CGO disabled. It publishes a GitHub Release with generated
+release notes, the four `updater-{linux,darwin}-{amd64,arm64}` binaries, and a
+`SHA256SUMS` file. Tags containing a hyphen, such as `v1.1.0-rc.1`, create prereleases.
+GitHub Actions must be enabled for the repository. The workflow uses the built-in
+`GITHUB_TOKEN` with `contents: write`; no additional secrets are needed.
+Commit and push the workflow before pushing the first release tag, and use a new
+tag for each release.
+
+To verify a downloaded binary, save `SHA256SUMS` beside it and run:
+
+```sh
+# Linux
+sha256sum --ignore-missing -c SHA256SUMS
+# macOS (replace the filename if using an Intel Mac)
+grep ' updater-darwin-arm64$' SHA256SUMS | shasum -a 256 -c -
+```
 
 ## Manual build
 
