@@ -73,7 +73,7 @@ esac
 				t.Fatal(err)
 			}
 			_, err = os.Stat(filepath.Join(target, "ran"))
-			if tc.skip != os.IsNotExist(err) || tc.skip != strings.Contains(result, "run пропущен") {
+			if tc.skip != os.IsNotExist(err) || tc.skip != strings.Contains(result, "run skipped") {
 				t.Fatalf("skip=%v, stat=%v, result=%s", tc.skip, err, result)
 			}
 			if !tc.cloned {

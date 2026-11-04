@@ -62,16 +62,16 @@ func browseItems(m *menuUI, path string, runProject func(string) error) error {
 		for i, entry := range c.Items {
 			labels[i] = entry.Target
 			if entry.Enabled != nil && !*entry.Enabled {
-				labels[i] += " [отключён]"
+				labels[i] += " [disabled]"
 			}
 		}
-		selected, err = m.choose("Проекты config.items", labels, min(selected, len(labels)-1))
+		selected, err = m.choose("Projects in config.items", labels, min(selected, len(labels)-1))
 		if err != nil || selected < 0 {
 			return err
 		}
 		entry := c.Items[selected]
 		for {
-			action, err := m.choose(entry.Target, []string{"Изменить настройки", "Запустить проект", "Посмотреть логи"}, 0)
+			action, err := m.choose(entry.Target, []string{"Edit settings", "Run project", "View logs"}, 0)
 			if err != nil {
 				return err
 			}
@@ -94,11 +94,11 @@ func browseItems(m *menuUI, path string, runProject func(string) error) error {
 				return actionErr
 			}
 			if actionErr != nil && !errors.Is(actionErr, errEditCanceled) {
-				if err := m.view("Ошибка", actionErr.Error()); err != nil {
+				if err := m.view("Error", actionErr.Error()); err != nil {
 					return err
 				}
 			} else if action != 2 && actionErr == nil {
-				if err := m.view("Готово", "Операция завершена."); err != nil {
+				if err := m.view("Done", "Operation completed."); err != nil {
 					return err
 				}
 			}
@@ -123,7 +123,7 @@ func editItem(path string, original []byte, index int, ask func(string) (string,
 		name  string
 		value *string
 	}{{"repo", &entry.Repo}, {"target", &entry.Target}, {"run", &entry.Run}} {
-		value, err := ask(field.name + " [" + *field.value + "] (Enter — сохранить, Esc — отменить): ")
+		value, err := ask(field.name + " [" + *field.value + "] (Enter — keep, Esc — cancel): ")
 		if err != nil {
 			return err
 		}

@@ -68,7 +68,7 @@ func TestDiskSpaceSummary(t *testing.T) {
 	dir := t.TempDir()
 	for _, path := range []string{dir, filepath.Join(dir, "missing", "target")} {
 		got := diskSpaceSummary(path)
-		if !regexp.MustCompile(`^💾 свободно [0-9]+\.[0-9]{2} ГБ \([0-9]+\.[0-9]{2}%\)$`).MatchString(got) {
+		if !regexp.MustCompile(`^💾 free [0-9]+\.[0-9]{2} GB \([0-9]+\.[0-9]{2}%\)$`).MatchString(got) {
 			t.Fatalf("unexpected disk space summary: %s", got)
 		}
 	}
@@ -76,7 +76,7 @@ func TestDiskSpaceSummary(t *testing.T) {
 	if err := os.WriteFile(file, nil, 0600); err != nil {
 		t.Fatal(err)
 	}
-	if got := diskSpaceSummary(filepath.Join(file, "target")); got != "💾 свободное место: не удалось определить" {
+	if got := diskSpaceSummary(filepath.Join(file, "target")); got != "💾 free space: unavailable" {
 		t.Fatalf("unexpected stat error summary: %s", got)
 	}
 }
@@ -103,7 +103,7 @@ func TestDiskSpaceWarning(t *testing.T) {
 		if err := r.ParseForm(); err != nil {
 			t.Fatal(err)
 		}
-		if message := r.Form.Get("text"); !strings.Contains(message, "Мало свободного места") || !strings.Contains(message, filepath.Join(dir, []string{"one", "two"}[(calls-1)%2])) {
+		if message := r.Form.Get("text"); !strings.Contains(message, "Low disk space") || !strings.Contains(message, filepath.Join(dir, []string{"one", "two"}[(calls-1)%2])) {
 			t.Errorf("unexpected warning: %s", message)
 		}
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"ok":true}`)), Header: make(http.Header)}, nil

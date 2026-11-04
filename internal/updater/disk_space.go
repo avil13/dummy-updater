@@ -38,11 +38,11 @@ func targetDiskStats(path string) (syscall.Statfs_t, error) {
 func diskSpaceSummary(path string) string {
 	stat, err := targetDiskStats(path)
 	if err != nil || stat.Blocks == 0 {
-		return "💾 свободное место: не удалось определить"
+		return "💾 free space: unavailable"
 	}
 	freeGB := float64(stat.Bavail) * float64(stat.Bsize) / 1_000_000_000
 	percent := float64(stat.Bavail) / float64(stat.Blocks) * 100
-	return fmt.Sprintf("💾 свободно %.2f ГБ (%.2f%%)", freeGB, percent)
+	return fmt.Sprintf("💾 free %.2f GB (%.2f%%)", freeGB, percent)
 }
 
 func checkFreeSpace(ctx context.Context, path string, threshold int, tg telegramConfig, logger *log.Logger) bool {
@@ -55,7 +55,7 @@ func checkFreeSpace(ctx context.Context, path string, threshold int, tg telegram
 		return false
 	}
 	host, _ := os.Hostname()
-	message := fmt.Sprintf("⚠️ Мало свободного места — %s: %s; свободно %.2f%%, порог %d%%", host, path, float64(stat.Bavail)/float64(stat.Blocks)*100, threshold)
+	message := fmt.Sprintf("⚠️ Low disk space — %s: %s; free %.2f%%, threshold %d%%", host, path, float64(stat.Bavail)/float64(stat.Blocks)*100, threshold)
 	red, reset := "", ""
 	if os.Getenv("NO_COLOR") == "" && os.Getenv("TERM") != "" && os.Getenv("TERM") != "dumb" {
 		if info, err := os.Stderr.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {

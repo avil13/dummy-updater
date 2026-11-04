@@ -28,8 +28,8 @@ func TestProjectOutput(t *testing.T) {
 	screen.Reset()
 	write("\033[31")
 	write("mprogress 10%\rprogress 20%\033[0m\033]title")
-	write("\033\\\tготово")
-	if string(p.line) != "progress 20%    готово" {
+	write("\033\\\tdone ✓")
+	if string(p.line) != "progress 20%    done ✓" {
 		t.Fatalf("unexpected partial line: %q", p.line)
 	}
 	if strings.Contains(screen.String(), "\033[31m") || strings.Contains(screen.String(), "title") {

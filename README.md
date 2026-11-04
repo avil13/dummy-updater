@@ -1,35 +1,33 @@
 # dummi-updater
 
-Последовательно обновляет Git-репозитории и выполняет
-команду из обязательного поля `run` в каждом target.
+Sequentially updates Git repositories and executes the command from the required
+`run` field in each target.
 
-## Требования
+## Requirements
 
-- Linux или macOS (Intel / Apple Silicon).
-- Git и доступ к репозиториям через SSH-ключи или credential helper.
-- Запущенный Docker и команда `docker compose`.
-- Compose-файл в корне каждого целевого репозитория.
-- Go 1.22+ только для сборки и pre-commit; для готовых бинарников не нужен.
+- Linux or macOS (Intel / Apple Silicon).
+- Git and repository access via SSH keys or a credential helper.
+- Docker running and the `docker compose` command available.
+- A Compose file in the root of each target repository.
+- Go 1.22+ only for building and pre-commit; not needed for prebuilt binaries.
 
-## Настройка
+## Configuration
 
-1. Добавьте проект через `./update.sh add` или заполните `config.json` вручную: `repo` — URL для клонирования,
-   `target` — директория проекта, `run` — непустая строка команды запуска.
-   Все три поля обязательны. Необязательное поле `retry` — число дополнительных
-   попыток `run` после ошибки (целое число ≥ 0, по умолчанию 2).
-   `retry: 0` отключает повторы. Добавляйте нужное количество элементов.
-   `enabled: false` отключает работу с item: обновление пропускает его,
-   а `stop` не показывает в списке. `enabled: true` включает item;
-   отсутствие поля (или `null`) равнозначно `true` для совместимости.
-   Отключённые записи также должны проходить валидацию конфига.
-   Изменение поля само по себе не останавливает уже запущенные контейнеры.
-   Для существующего проекта `repo` должен точно совпадать с
-   `git remote get-url origin`.
-2. Установите Git, Docker и Compose plugin на Linux или macOS.
-3. Запустите `bash update.sh` или нужный бинарник:
+1. Add a project with `./update.sh add` or fill in `config.json` manually:
+   `repo` is the clone URL, `target` is the project directory, and `run` is a nonempty launch command.
+   All three fields are required. The optional `retry` field sets the number of
+   additional `run` attempts after a failure (integer ≥ 0, default: 2).
+   `retry: 0` disables retries. Add as many items as needed.
+   `enabled: false` disables an item: updates skip it and `stop` omits it from the list.
+   `enabled: true` enables it; an omitted field (or `null`) means `true` for compatibility.
+   Disabled entries must still pass configuration validation.
+   Changing this field alone does not stop running containers.
+   For an existing project, `repo` must exactly match `git remote get-url origin`.
+2. Install Git, Docker, and the Compose plugin on Linux or macOS.
+3. Run `bash update.sh` or the appropriate binary:
    `./dist/updater-linux-amd64 -config ./config.json`.
 
-Пример `config.json` для двух проектов:
+Example `config.json` for two projects:
 
 ```json
 {
@@ -58,239 +56,233 @@
 }
 ```
 
-Поле `$schema` подключает [JSON Schema](schema/v1/schema.json) для подсказок
-и проверки конфига в редакторе. CLI принимает это поле, не скачивает схему
-и сохраняет ссылку при `add`. Проверку уникальности нормализованных target
-и состояния репозиториев по-прежнему выполняет CLI.
-Ссылка на GitHub станет доступна после публикации схемы в ветке `master`.
+The `$schema` field connects the [JSON Schema](schema/v1/schema.json) for editor
+suggestions and configuration validation. The CLI accepts this field without
+downloading the schema and preserves the URL during `add`. The CLI still checks
+normalized target uniqueness and repository state.
+The GitHub URL becomes available once the schema is published on the `master` branch.
 
-Замените URL и пути своими значениями. Ключ называется `repo`, без двоеточия.
-На macOS используйте доступные вам пути, например `/Users/your-user/projects/backend`.
+Replace the URLs and paths with your own values. The key is `repo`, without a colon.
+On macOS, use accessible paths such as `/Users/your-user/projects/backend`.
 
-## Запуск
+## Running
 
 ```sh
-# Автоматический выбор бинарника и JSON из директории скрипта
+# Automatically select the binary and JSON next to the script
 bash update.sh
 
-# Справка по командам и параметрам (оба варианта равнозначны)
+# Command and option help (both forms are equivalent)
 ./update.sh -h
 ./update.sh --help
 
-# Другая конфигурация
+# Use a different configuration
 bash update.sh -config /absolute/path/config.json
 
-# Прямой запуск, например на Apple Silicon
+# Run directly, for example on Apple Silicon
 ./dist/updater-darwin-arm64 -config ./config.json
 ```
 
-`update.sh` автоматически выбирает Linux/macOS и amd64/arm64.
-Для macOS доступны `dist/updater-darwin-amd64` (Intel) и
+`update.sh` automatically selects Linux/macOS and amd64/arm64.
+For macOS, use `dist/updater-darwin-amd64` (Intel) or
 `dist/updater-darwin-arm64` (Apple Silicon).
 
-Без `-config` JSON ищется рядом с бинарником. Относительные target
-разрешаются относительно JSON. Для standalone-установки скопируйте
-бинарник и JSON в одну директорию.
+Without `-config`, JSON is loaded from beside the binary. Relative targets are
+resolved relative to the JSON file. For a standalone installation, copy the
+binary and JSON into the same directory.
 
-## Добавление проекта
+## Adding a project
 
 ```sh
 ./update.sh add
 ./update.sh add ../path/to/repo
 ./update.sh add -config /absolute/path/config.json
-# Напрямую через бинарник
+# Directly through the binary
 ./dist/updater-darwin-arm64 add -config ./config.json
 ```
 
-Команда последовательно спрашивает `repo`, `target`, `run`, `retry` и `enabled` на английском.
-Если передан путь к локальному Git-репозиторию, он разрешается относительно
-текущего каталога: абсолютный путь предлагается как `target`, а URL `origin` —
-как `repo`. Enter принимает предложенное значение; другой ввод заменяет его.
-Каталог должен содержать `.git` и remote `origin`, иначе конфиг не меняется.
-В терминале вопросы выделены голубым, сообщение об успехе — зелёным.
-При перенаправлении вывода цвета отключены, как и при `TERM=dumb` или
-непустой переменной `NO_COLOR` (например, `NO_COLOR=1 ./update.sh add`).
-`repo` и `target` нужно заполнить. Для `run` предлагается команда
-`docker compose up -d --build --remove-orphans`: Enter выбирает её,
-либо введите свою команду. Enter для `retry` сохраняет явное значение `3`
-(3 дополнительные попытки), `0` отключает повторы. Это значение для новых
-записей `add`; существующие записи не меняются.
-Для `enabled` Enter или `true` сохраняет `true`; `false` отключает item.
-Другие значения отклоняются без изменения конфига.
-Относительный `target` задаётся относительно директории конфига.
-Если JSON отсутствует, команда создаёт его. Существующий конфиг должен быть
-валидным; его записи и относительные пути сохраняются.
-При успешном `add` отсутствующие общие настройки (а также значения `null`)
-заполняются: `$schema` — ссылка из примера, `log.max_err_mb` — `1`,
-`log.max_project_mb` — `0.5`, `log.retention_days` — `7`, `log.free_size` — `"10%"`.
-Блок `tg` сохраняется со всеми полями: по умолчанию `enabled: false`,
-`only_errors: false`, `bot_token: ""`, `chat_id: ""`.
-Уже заданные значения, включая `0`, `false` и `"0%"`, не заменяются.
-Это включает проверку места для конфигов без `free_size`; для отключения
-задайте `"0%"`. Добавленный блок `tg` содержит `enabled: false`:
-для уведомлений включите его вручную. Пустые `bot_token` и `chat_id`
-будут взяты из соответствующих переменных `TELEGRAM_*`.
-Необязательные поля существующих items не дополняются.
-Повторяющиеся target
-и ошибочный ввод отклоняются без изменения JSON. При прерванном вводе запись
-также не производится; исправьте значения и повторите команду.
-Файл сохраняется атомарно с правами `0600` (доступ только владельцу),
-с той же блокировкой, что и обновление. При переданном пути Git используется
-только для чтения `origin`. Docker и команды проектов не запускаются.
+The command prompts for `repo`, `target`, `run`, `retry`, and `enabled` in English.
+If a local Git repository path is supplied, it is resolved relative to the current
+directory: its absolute path is suggested as `target`, and its `origin` URL as `repo`.
+Enter accepts the suggested value; other input replaces it.
+The directory must contain `.git` and an `origin` remote, otherwise the configuration is unchanged.
+In a terminal, prompts are blue and success messages are green.
+Colors are disabled when output is redirected, when `TERM=dumb`, or when `NO_COLOR`
+is nonempty (for example, `NO_COLOR=1 ./update.sh add`).
+`repo` and `target` are required. The suggested `run` command is
+`docker compose up -d --build --remove-orphans`: press Enter to accept it or enter your own command.
+For `retry`, Enter saves an explicit value of `3` (3 additional attempts);
+`0` disables retries. This default applies to new entries created by `add`;
+existing entries are unchanged.
+For `enabled`, Enter or `true` saves `true`; `false` disables the item.
+Other values are rejected without changing the configuration.
+Relative `target` paths are resolved relative to the configuration directory.
+If the JSON file does not exist, the command creates it. An existing configuration
+must be valid; its entries and relative paths are preserved.
+On a successful `add`, missing global settings (including `null` values) are filled in:
+`$schema` uses the example URL, `log.max_err_mb` is `1`, `log.max_project_mb` is `0.5`,
+`log.retention_days` is `7`, and `log.free_size` is `"10%"`.
+The `tg` block is saved with all fields: defaults are `enabled: false`,
+`only_errors: false`, `bot_token: ""`, and `chat_id: ""`.
+Existing values, including `0`, `false`, and `"0%"`, are not replaced.
+This enables disk space checking for configurations without `free_size`;
+set it to `"0%"` to disable checking. An added `tg` block has `enabled: false`:
+enable notifications manually. Empty `bot_token` and `chat_id` values are read
+from the corresponding `TELEGRAM_*` environment variables.
+Optional fields in existing items are not filled in.
+Duplicate targets and invalid input are rejected without changing the JSON.
+Interrupted input also leaves the file unchanged; correct the values and try again.
+The file is saved atomically with `0600` permissions (owner-only access), using
+the same lock as updates. When a repository path is supplied, Git is used only
+to read `origin`. Docker and project commands are not executed.
 
-## Интерактивный список проектов
+## Interactive project list
 
 ```sh
 ./update.sh ls
 ./update.sh ls -config /absolute/path/config.json
-# Напрямую через бинарник; -config можно поставить перед ls
+# Directly through the binary; -config can also precede ls
 ./dist/updater-darwin-arm64 -config ./config.json ls
 ```
 
-Нужен интерактивный терминал и стандартная утилита `stty` (Linux/macOS).
-Список показывает все `config.items`, включая отключённые.
-Стрелки ↑/↓ или `j`/`k` выбирают проект; Enter открывает его меню.
-`q` или Esc возвращает на предыдущий уровень, а из списка — завершает `ls`.
-Ctrl+C завершает команду; настройки терминала восстанавливаются при выходе.
+Requires an interactive terminal and the standard `stty` utility (Linux/macOS).
+The list shows all `config.items`, including disabled entries.
+Use ↑/↓ or `j`/`k` to select a project; Enter opens its menu.
+`q` or Esc goes back one level, or exits `ls` from the project list.
+Ctrl+C exits the command; terminal settings are restored on exit.
 
-В меню проекта доступны:
-- **Изменить настройки** — последовательно ввести `repo`, `target`, `run`,
-  `retry`, `enabled`. Enter без ввода сохраняет текущее значение
-  (для отсутствующих `retry` и `enabled` — поведение по умолчанию: 2 и true).
-  Backspace удаляет символ; Esc отменяет все изменения, `q` в поле — обычный текст.
-  Общие настройки `log` и `tg` не редактируются.
-  После валидации всего конфига файл заменяется атомарно с правами `0600`.
-  Относительные пути сохраняются; при ошибке, блокировке или изменении конфига
-  другим процессом во время ввода запись не производится.
-- **Запустить проект** — обычное обновление Git и выполнение `run`, но только
-  для выбранного target, с прежними повторами, блокировкой, логами и Telegram.
-  Для отключённого проекта сначала установите `enabled: true`.
-  Во время запуска `q`/Esc не прерывают команды; для отмены используйте Ctrl+C.
-- **Посмотреть логи** — ошибки этого target из `error.log` и его сохранённые
-  файлы вывода (новые сверху). Enter открывает журнал, ↑/↓ прокручивают его,
-  Enter/`q`/Esc возвращают назад. Вывод успешных запусков, как и раньше,
-  не сохраняется. При отключённых логах или после очистки история может отсутствовать.
+The project menu provides:
+- **Edit settings** — prompts for `repo`, `target`, `run`, `retry`, and `enabled`.
+  Enter without input keeps the current value (for omitted `retry` and `enabled`,
+  the defaults are 2 and true).
+  Backspace deletes a character; Esc cancels all changes; `q` is ordinary text in a field.
+  Global `log` and `tg` settings are not editable here.
+  After validating the entire configuration, the file is atomically replaced with `0600` permissions.
+  Relative paths are preserved; errors, a lock, or another process changing the
+  configuration during input prevent the write.
+- **Run project** — performs the normal Git update and `run` handling for the
+  selected target only, with the same retries, locking, logs, and Telegram notifications.
+  For a disabled project, first set `enabled: true`.
+  During execution, `q`/Esc do not interrupt commands; use Ctrl+C to cancel.
+- **View logs** — shows errors for this target from `error.log` and its saved
+  output files (newest first). Enter opens a log, ↑/↓ scrolls, and Enter/`q`/Esc goes back.
+  Output from successful runs is still not saved. History may be unavailable
+  when logging is disabled or after cleanup.
 
-Файлы вывода теперь называются `project-output-<SHA256 абсолютного target>-<случайный суффикс>.log`.
-Это позволяет найти журнал даже после обрезки его начала или `error.log`.
-Старые файлы без идентификатора показываются, если ссылка на них ещё есть
-в строке ошибки этого проекта. Символические ссылки и каталоги вместо
-файлов вывода не открываются.
-При изменении target прежняя история остаётся привязана к старому пути.
-В просмотре управляющие символы удаляются, чтобы вывод команд не управлял терминалом.
-Меню рассчитано на терминал высотой не менее 20 строк.
+Output files are now named `project-output-<SHA256 of absolute target>-<random suffix>.log`.
+This allows locating a log even after its beginning or `error.log` has been truncated.
+Older files without an identifier are shown if this project's error entry still
+contains a reference to them. Symbolic links and directories are not opened as output files.
+Changing a target leaves its previous history associated with the old path.
+Control characters are removed in the log viewer to prevent command output from controlling the terminal.
+The menu requires a terminal at least 20 lines high.
 
-## Остановка контейнеров
+## Stopping containers
 
 ```sh
 ./update.sh stop
 ./update.sh stop -config /absolute/path/config.json
-# Напрямую через бинарник
+# Directly through the binary
 ./dist/updater-darwin-arm64 stop -config ./config.json
 ```
 
-Команда показывает нумерованный список `items` (пути `target`). Введите номер
-проекта: в его директории выполнится `docker compose stop`, останавливающий
-все сервисы этого Compose-проекта без удаления контейнеров, сетей и томов.
-Другие проекты не затрагиваются. Enter отменяет выбор; неверный номер или
-прерванный ввод завершают команду без запуска Docker.
-Git и команда `run` не запускаются, повторов нет. Используется та же блокировка
-конфига; ошибки остановки записываются в `logs/error.log` и stderr.
-Команда использует стандартный Compose-файл и окружение текущего процесса,
-а не параметры `-f`/`-p` из `run`. Формат JSON не меняется.
-Следующий обычный запуск updater снова выполнит `run` и может запустить контейнеры.
+The command shows a numbered list of `items` (their `target` paths). Enter a project
+number to execute `docker compose stop` in its directory, stopping all services
+of that Compose project without removing containers, networks, or volumes.
+Other projects are unaffected. Enter cancels selection; invalid or interrupted
+input exits without running Docker.
+Git and `run` are not executed, and there are no retries. The same configuration
+lock is used; stop errors are written to `logs/error.log` and stderr.
+The command uses the standard Compose file and current process environment,
+not `-f`/`-p` options from `run`. The JSON format is unchanged.
+The next normal updater invocation will execute `run` again and may start the containers.
 
-## Поведение обновления
+## Update behavior
 
-Отсутствующий target клонируется. Существующий обновляется через
-`git pull --ff-only` (текущая ветка и её upstream).
-Локальные изменения, включая untracked-файлы, приводят к пропуску проекта.
-Ошибки не останавливают остальные проекты; итоговый код выхода — 1.
-Перед `pull` и после него читается hash `HEAD`. Если hash не изменился,
-в `target` выполняются только проверки `docker compose config --services` и
-`docker compose ps --all --format json`. Если у каждого сервиса есть контейнер,
-все контейнеры находятся в состоянии `running`, а healthcheck (если задан) —
-`healthy`, команда `run` пропускается. Проверки не перезапускают контейнеры.
-Без healthcheck проверяется только состояние контейнера, а не работоспособность приложения.
-Используются стандартный Compose-файл и окружение updater; параметры `-f`/`-p`
-и переменные из строки `run` не учитываются.
-При изменившемся hash, после клонирования, при остановленных/нездоровых контейнерах,
-отсутствующих сервисах или ошибке проверки выполняется `run` через `sh -c`
-в каталоге `target`. При ошибке `run` повторяется сразу,
-до `retry` дополнительных раз; после успеха повторы прекращаются. Git-операции
-не повторяются. При остановке updater повторы прекращаются.
-Поддерживаются кавычки, переменные
-окружения и shell-операторы (`&&`, `|` и другие). Команды `docker compose ps`
-после запуска и `docker compose logs --tail=30` при ошибке остаются фиксированными.
-Для `docker compose up` это не безусловный restart: неизменившиеся контейнеры
-Compose может оставить работающими.
+A missing target is cloned. An existing target is updated with
+`git pull --ff-only` (using the current branch and its upstream).
+Local changes, including untracked files, cause the project to be skipped.
+Errors do not stop other projects; the final exit code is 1 if any project fails.
+The `HEAD` hash is read before and after `pull`. If the hash is unchanged,
+only `docker compose config --services` and `docker compose ps --all --format json`
+checks are run in `target`. If every service has a container, all containers
+are `running`, and their healthchecks (if configured) report `healthy`, `run` is skipped.
+These checks do not restart containers. Without a healthcheck, only the container
+state is checked, not application health.
+The standard Compose file and updater environment are used; `-f`/`-p` options
+and variables in the `run` string are not taken into account.
+When the hash changes, after cloning, when containers are stopped/unhealthy,
+when services are missing, or when a check fails, `run` is executed through `sh -c`
+in `target`. On failure, `run` is retried immediately, up to `retry` additional
+times; retries stop after success. Git operations are not retried.
+Stopping updater also stops retries.
+Quotes, environment variables, and shell operators (`&&`, `|`, and others) are supported.
+The `docker compose ps` command after execution and `docker compose logs --tail=30`
+on failure remain fixed.
+For `docker compose up`, this is not an unconditional restart: Compose may leave
+unchanged containers running.
 
-Логи хранятся в папке `logs/` рядом с JSON (создаётся с правами `0700`).
-Ошибки обновления проектов записываются в `logs/error.log`
-и одновременно выводятся в stderr с путём проекта и причиной ошибки.
-Размер `error.log` задаёт `log.max_err_mb` (по умолчанию 1 МБ): сохраняется
-конец журнала, при необходимости с обрезкой первой строки. Лимит действует
-при обновлении и `stop`; существующий большой журнал сокращается при открытии.
-`log.max_err_mb: 0` отключает файл, но ошибки по-прежнему выводятся в stderr.
-Информационные сообщения, предупреждения и вывод команд остаются в консоли.
-В терминале вывод текущего проекта обновляется в блоке из 10 строк под
-заголовком `Checking project`. Завершённый блок заменяется строкой
-`✅ [target]` или `❌ [target]`; результаты предыдущих проектов остаются выше.
-Для пропущенного из-за локальных изменений проекта выводится `⏭ [target]`.
-Длинные строки обрезаются по ширине терминала; требуется не менее 12 строк
-высоты. Перед первым проектом добавляются два перевода строки.
-Путь в скобках зелёный, если не задан `NO_COLOR`.
-При перенаправлении stdout, пустом `TERM` или `TERM=dumb` используется обычный
-вывод без ANSI и без ограничения в 10 строк, с разделением проектов двумя
-переводами строки.
+Logs are stored in a `logs/` directory beside the JSON file (created with `0700` permissions).
+Project update errors are written to `logs/error.log` and stderr, including the
+project path and the cause of the error.
+The size of `error.log` is controlled by `log.max_err_mb` (default: 1 MB): the end
+of the log is kept, with the first line truncated if necessary. The limit applies
+to updates and `stop`; an existing oversized log is truncated when opened.
+`log.max_err_mb: 0` disables the file, but errors still appear on stderr.
+Informational messages, warnings, and command output remain in the console.
+In a terminal, the current project's output is refreshed in a 10-line block under
+`Checking project`. A completed block is replaced with a `✅ [target]` or
+`❌ [target]` line; previous project results remain above it.
+Projects skipped because of local changes are shown as `⏭ [target]`.
+Long lines are truncated to the terminal width; at least 12 lines of terminal height are required.
+Two newlines are added before the first project.
+The path in brackets is green unless `NO_COLOR` is set.
+When stdout is redirected, `TERM` is empty, or `TERM=dumb`, plain output is used
+without ANSI or a 10-line limit, with two newlines separating projects.
 
-Вывод каждого проекта временно записывается в папку `logs/`. Поле
-`log.max_project_mb` задаёт максимальный размер каждого `project-output-*.log`;
-по умолчанию — `0.5` МБ (500 000 байт). Оба лимита задаются в МБ
-(1 МБ = 1 000 000 байт), допускаются дробные значения. Отсутствующее поле
-или `null` использует значение по умолчанию.
-При превышении лимита сохраняется только конец вывода; начало может оказаться
-посреди строки. При ошибке файл сохраняется, а его путь указывается в `error.log`
-и stderr; при успехе файл удаляется. Права файла — `0600`.
-`log.max_project_mb: 0` отключает создание этих файлов, но не `error.log`.
-Прежнее поле `output_log_max_kb` заменено на `log.max_project_mb`.
-Отключение записи файлов не отключает очистку по `log.retention_days`.
-При аварийном завершении процесса кольцевой файл может быть не упорядочен;
-после штатного завершения проекта записи идут в исходном порядке.
-Вывод команд может содержать секреты: не публикуйте эти файлы без проверки.
-`log.retention_days` задаёт срок хранения логов проектов в целых днях
-(по умолчанию `7`, отсутствие поля или `null` использует это значение).
-При запуске обновления или `stop` удаляются только обычные файлы
-`logs/project-output-*.log`, изменённые не менее указанного числа суток назад.
-`0` отключает очистку. Посторонние файлы, подпапки и символические ссылки
-не удаляются; `error.log` ограничивается по размеру, а не по возрасту.
-`log.free_size: "10%"` включает проверку свободного места на диске каждого
-`target`: до и после обработки проекта. Если target ещё не существует,
-проверяется диск ближайшего существующего родительского каталога.
-Отключённые проекты не проверяются. Учитывается место,
-доступное текущему пользователю. Значение — строка с целым процентом от `0%`
-до `100%`; отсутствие поля или `null` отключает проверку, `0%` не предупреждает.
-Если свободного места строго меньше порога, выводится предупреждение в stderr
-(красным в терминале, если не задан `NO_COLOR`) и сразу отправляется уведомление
-в Telegram, если он включён, в том числе при `only_errors: true`.
-За один запуск предупреждение отправляется не более одного раза для каждого target; обновление
-не прерывается. Ошибка проверки выводится как предупреждение. Это не фоновый
-мониторинг: во время выполнения команды диск не проверяется. `add` и `stop`
-проверку не выполняют.
+Each project's output is temporarily recorded in `logs/`. `log.max_project_mb`
+sets the maximum size of each `project-output-*.log` file; the default is `0.5` MB
+(500,000 bytes). Both limits use MB (1 MB = 1,000,000 bytes) and accept fractional values.
+An omitted field or `null` uses the default value.
+When the limit is exceeded, only the end of the output is kept; its beginning may
+be in the middle of a line. On failure, the file is retained and its path is
+included in `error.log` and stderr; on success, the file is deleted. File permissions are `0600`.
+`log.max_project_mb: 0` disables these files, but not `error.log`.
+The old `output_log_max_kb` field has been replaced with `log.max_project_mb`.
+Disabling log writes does not disable cleanup according to `log.retention_days`.
+After an abnormal exit, the ring-buffer file may be out of order; after normal
+project completion, its entries are chronological.
+Command output may contain secrets: review these files before publishing them.
+`log.retention_days` sets project log retention in whole days
+(default: `7`; an omitted field or `null` uses this default).
+At the start of updates or `stop`, only regular `logs/project-output-*.log` files
+last modified at least that many days ago are removed.
+`0` disables cleanup. Other files, subdirectories, and symbolic links are untouched;
+`error.log` is limited by size, not age.
+`log.free_size: "10%"` enables free disk space checks for each `target` before and
+after processing the project. If the target does not yet exist, the disk of its
+nearest existing parent directory is checked.
+Disabled projects are not checked. Space available to the current user is used.
+The value is a string containing an integer percentage from `0%` to `100%`;
+an omitted field or `null` disables checking, and `0%` disables warnings.
+If free space is strictly below the threshold, a warning is printed to stderr
+(red in a terminal unless `NO_COLOR` is set) and immediately sent to Telegram
+if enabled, including when `only_errors: true`.
+A warning is sent at most once per target per invocation; updates are not interrupted.
+Check failures are reported as warnings. This is not background monitoring:
+disk space is not checked while a command is running. `add` and `stop` do not perform this check.
 
-Старые логи рядом с JSON автоматически не переносятся и не удаляются.
-Ошибка создания папки или очистки прерывает запуск до выполнения команд.
-Блокировка не допускает параллельного запуска
-с одним и тем же JSON и освобождается ОС при завершении. Не запускайте разные
-конфигурации с пересекающимися target одновременно.
-Используйте только доверенные репозитории и JSON: `run` выполняет произвольные
-shell-команды с правами пользователя updater, а Compose запускает код репозитория.
-Команда `run` должна допускать повторное выполнение: при ошибке она запускается целиком.
-Не помещайте токены в URL репозитория; используйте SSH-ключи или Git credential helper.
+Old logs beside the JSON file are not moved or deleted automatically.
+Failure to create the log directory or clean up logs aborts execution before commands run.
+The lock prevents concurrent runs with the same JSON file and is released by the OS
+when the process exits. Do not run different configurations with overlapping targets concurrently.
+Use only trusted repositories and JSON: `run` executes arbitrary shell commands
+with the updater user's permissions, and Compose runs repository code.
+The `run` command must support repeated execution: after a failure, the entire command is retried.
+Do not put tokens in repository URLs; use SSH keys or a Git credential helper.
 
 ## Telegram
 
-В корне `config.json` задайте необязательный блок:
+Add an optional block at the root of `config.json`:
 
 ```json
 "tg": {
@@ -301,115 +293,114 @@ shell-команды с правами пользователя updater, а Comp
 }
 ```
 
-При `enabled: true` токен и ID чата должны быть заданы в конфиге или окружении.
-Пустые, отсутствующие, `null` или состоящие только из пробелов `bot_token`
-и `chat_id` берутся из `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHAT_ID` соответственно.
-Непустые значения из конфига имеют приоритет; секреты из окружения в JSON не записываются.
-В `config.example.json` уведомления отключены: заполните поля и включите `enabled`.
+When `enabled: true`, the token and chat ID must be set in the configuration or environment.
+Empty, omitted, `null`, or whitespace-only `bot_token` and `chat_id` values are read
+from `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, respectively.
+Nonempty configuration values take precedence; environment secrets are not written to JSON.
+Notifications are disabled in `config.example.json`: fill in the fields and enable them.
 
-### Настройка канала
+### Channel setup
 
-Отправка устроена как в [ssh-telegram-alert](https://github.com/avil13/ssh-telegram-alert):
-HTTP POST к Telegram Bot API `sendMessage` с токеном бота и ID канала.
-Превью ссылок отключены. Сообщения отправляются обычным текстом без Markdown,
-чтобы спецсимволы в путях не ломали отчёт; отправка завершается до выхода updater.
+Delivery works like [ssh-telegram-alert](https://github.com/avil13/ssh-telegram-alert):
+an HTTP POST to Telegram Bot API `sendMessage` with the bot token and channel ID.
+Link previews are disabled. Messages are sent as plain text without Markdown,
+so special characters in paths cannot break the report. Sending finishes before updater exits.
 
-1. Создайте бота через @BotFather и получите токен.
-2. Создайте приватный или публичный канал. Добавьте бота администратором
-   с правом публикации сообщений и опубликуйте новый пост в канале.
-3. Откройте в браузере следующий URL, заменив `<TOKEN>` токеном бота:
+1. Create a bot through @BotFather and obtain its token.
+2. Create a private or public channel. Add the bot as an administrator with
+   permission to post messages, then publish a new post in the channel.
+3. Open the following URL in a browser, replacing `<TOKEN>` with the bot token:
 
    ```text
    https://api.telegram.org/bot<TOKEN>/getUpdates
    ```
 
-4. В ответе найдите `channel_post.chat.id` нужного канала.
-   Например, объект `chat` выглядит так:
+4. Find `channel_post.chat.id` in the response. For example, the `chat` object might be:
 
    ```json
    {
      "id": -1001234567890,
-     "title": "Уведомления updater",
+     "title": "Updater notifications",
      "type": "channel"
    }
    ```
 
-5. Скопируйте ID в `tg.chat_id` **строкой**, сохранив минус, как в примере
-   конфигурации выше. Укажите токен в `tg.bot_token` и установите
-   `tg.enabled: true`.
+5. Copy the ID into `tg.chat_id` **as a string**, preserving the minus sign,
+   as shown in the configuration example above. Set the token in `tg.bot_token`
+   and enable `tg.enabled: true`.
 
-Для публичного канала вместо числового ID можно указать `"@channel_name"`.
-Группы и личные чаты также поддерживаются, для них ID находится в `message.chat.id`.
+For a public channel, `"@channel_name"` can be used instead of a numeric ID.
+Groups and private chats are also supported; their ID is available in `message.chat.id`.
 
-Если ответ содержит `"result": []`, опубликуйте новый пост и обновите
-страницу. При настроенном webhook метод `getUpdates` не работает.
-Не публикуйте токен и URL с ним: они дают доступ к управлению ботом.
+If the response contains `"result": []`, publish a new post and refresh the page.
+This method does not work when a webhook is configured.
+Do not publish the token or the URL containing it: they grant control over the bot.
 
-### Содержимое отчёта
+### Report contents
 
-`only_errors: true` отправляет только проекты с итоговой ошибкой. Если ошибок
-нет, сообщение не отправляется. Пропуски, отключённые проекты и ошибки попыток
-`run`, после которых повтор завершился успешно, в такой отчёт не попадают.
-Ошибка подготовки запуска (например, отсутствует Git) после чтения конфига
-и открытия лога также вызывает краткое уведомление; детали остаются в stderr.
-Ошибки чтения конфига, блокировки или открытия лога уведомление не отправляют.
+`only_errors: true` sends only projects with a final error. If there are no errors,
+no message is sent. Skipped projects, disabled projects, and failed `run` attempts
+followed by a successful retry are not included in this report.
+A startup preparation error (for example, missing Git) after reading the configuration
+and opening the log also triggers a brief notification; details remain on stderr.
+Configuration reading, locking, and log opening errors do not trigger notifications.
 
-При `only_errors: false` (по умолчанию) после обновления отправляется короткий отчёт по каждому target: клонирован,
-обновлён, без новых коммитов (с выполнением `run` или его пропуском при исправном Compose), ошибка, локальные изменения,
-отключён или не выполнен. Подробности ошибок остаются в `logs/error.log`.
-Для каждого target в отчёте добавляется свободное место на его диске
-на момент отправки: например, `💾 свободно 42.50 ГБ (18.30%)`.
-1 ГБ = 1 000 000 000 байт; учитывается место, доступное текущему пользователю.
-Если target отсутствует, используется ближайший существующий родительский каталог;
-при ошибке проверки вместо чисел выводится «не удалось определить».
-Эта информация не зависит от порога `log.free_size`, но следует фильтру
-`only_errors`: если отчёт не отправляется, отдельного сообщения с объёмом не будет.
-Длинный отчёт разбивается на сообщения, HTML и вывод команд не отправляются.
-Ошибка Telegram выводится как предупреждение и не меняет результат обновления.
-Команды `add` и `stop` отчёт не отправляют.
+With `only_errors: false` (the default), a brief report is sent after updating for
+each target: cloned, updated, no new commits (with `run` executed or skipped when
+Compose is healthy), error, local changes, disabled, or not run.
+Error details remain in `logs/error.log`.
+The report includes free disk space for each target at the time of sending,
+for example: `💾 free 42.50 GB (18.30%)`.
+1 GB = 1,000,000,000 bytes; space available to the current user is used.
+If the target does not exist, the nearest existing parent directory is used;
+if the check fails, the report shows "unavailable" instead of numbers.
+This information is independent of the `log.free_size` threshold but follows
+`only_errors`: if no report is sent, there is no separate disk space message.
+Long reports are split into multiple messages; HTML and command output are not sent.
+Telegram errors are printed as warnings and do not change the update result.
+The `add` and `stop` commands do not send reports.
 
-`tg.enabled: false` или `tg: {}` отключает уведомления. Если `tg` отсутствует,
-для совместимости используются `TELEGRAM_ENABLED=true`, `TELEGRAM_BOT_TOKEN`,
-`TELEGRAM_CHAT_ID`; они также включают итоговый отчёт вместо отдельных уведомлений.
+`tg.enabled: false` or `tg: {}` disables notifications. If `tg` is omitted,
+`TELEGRAM_ENABLED=true`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_CHAT_ID` are used
+for compatibility; these also enable the final report instead of individual notifications.
 
-## Структура исходников
+## Source layout
 
-- `cmd/updater/main.go` — точка входа CLI.
-- `internal/updater/` — конфигурация, обновление проектов, команды CLI,
-  Telegram и логирование; тесты расположены рядом с кодом.
-- `cmd/updater/main_test.go` — проверка собранного CLI.
+- `cmd/updater/main.go` — CLI entry point.
+- `internal/updater/` — configuration, project updates, CLI commands, Telegram,
+  and logging; tests live beside the implementation.
+- `cmd/updater/main_test.go` — tests for the built CLI.
 
-## Сборка и pre-commit
+## Building and pre-commit
 
-Нужны Go 1.22+ и `golangci-lint` в `PATH`. В каждом новом клоне включите hook:
+Go 1.22+ and `golangci-lint` on `PATH` are required. Enable the hook in each new clone:
 
 ```sh
 git config core.hooksPath .githooks
 ```
 
-При коммите hook сначала выполняет `golangci-lint run --fix` в рабочем каталоге.
-Если Go-файлы изменились, коммит останавливается: проверьте исправления,
-добавьте нужные изменения в index и повторите коммит. Hook не добавляет
-исправленные исходники в index автоматически. Ошибки lint также блокируют коммит.
-Если исправлений нет, hook проверяет тесты и собирает **staged-версию** исходников:
-`dist/updater-{linux,darwin}-{amd64,arm64}`, затем добавляет все четыре
-бинарника в коммит. Перед первым коммитом добавьте исходники в index.
-Docker тестами и hook не запускается.
+On commit, the hook first runs `golangci-lint run --fix` in the working directory.
+If Go files change, the commit is stopped: review the changes, stage them, and retry.
+The hook does not stage fixed source files automatically. Lint errors also block the commit.
+If there are no fixes, the hook tests the **staged** source snapshot and builds
+all four `dist/updater-{linux,darwin}-{amd64,arm64}` binaries, then stages them for the commit.
+Before the first commit, stage the source files.
+Neither the tests nor the hook run Docker.
 
-## Проверки
+## Verification
 
 ```sh
 go test ./...
 go vet ./...
 ```
 
-Текущие тесты проверяют чтение и валидацию JSON, выполнение `run` в target
-(включая повторный запуск и ошибки), интерактивное добавление проектов,
-редактирование и навигацию в `ls`, выборочный запуск, фильтрацию журналов
-и запись только ошибок в лог; Docker не запускают.
-Работу Compose проверяйте отдельно в своём окружении.
+Current tests cover JSON reading and validation, executing `run` in the target
+(including retries and failures), interactive project addition, editing and
+navigation in `ls`, selective execution, log filtering, and error-only logging;
+they do not run Docker.
+Check Compose behavior separately in your own environment.
 
-## Ручная сборка
+## Manual build
 
 ```sh
 mkdir -p dist

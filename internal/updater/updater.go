@@ -73,9 +73,9 @@ func runSelected(ctx context.Context, path, target string) (runErr error) {
 	projectErrors := make([]bool, len(c.Items))
 	failed := false
 	for i, entry := range c.Items {
-		statuses[i] = "⏭ не выполнен"
+		statuses[i] = "⏭ not run"
 		if entry.Enabled != nil && !*entry.Enabled {
-			statuses[i] = "⏭ отключён"
+			statuses[i] = "⏭ disabled"
 		}
 	}
 	defer func() {
@@ -84,10 +84,10 @@ func runSelected(ctx context.Context, path, target string) (runErr error) {
 		}
 		logger.SetPrefix("")
 		host, _ := os.Hostname()
-		message := "Отчёт updater — " + host
+		message := "Updater report — " + host
 		hasReport := false
 		if runErr != nil && !failed {
-			message += "\n❌ запуск не завершён (подробности в stderr)"
+			message += "\n❌ run did not complete (see stderr for details)"
 			hasReport = true
 		}
 		for i, entry := range c.Items {
@@ -102,7 +102,7 @@ func runSelected(ctx context.Context, path, target string) (runErr error) {
 			}
 			if len([]rune(message+line)) > 4000 {
 				notify(context.WithoutCancel(ctx), tg, message, logger)
-				message = "Отчёт updater (продолжение)"
+				message = "Updater report (continued)"
 			}
 			message += line
 		}
@@ -189,9 +189,9 @@ func runSelected(ctx context.Context, path, target string) (runErr error) {
 		}
 		if updateErr != nil {
 			projectErrors[i] = true
-			statuses[i] = "❌ ошибка (подробности в logs/error.log)"
+			statuses[i] = "❌ error (see logs/error.log for details)"
 			if errorLogLimit == 0 {
-				statuses[i] = "❌ ошибка (подробности в stderr)"
+				statuses[i] = "❌ error (see stderr for details)"
 			}
 			errorLogger.SetPrefix("[" + entry.Target + "] ")
 			logPath := ""

@@ -67,7 +67,7 @@ func update(ctx context.Context, entry item, output io.Writer, logger *log.Logge
 	}
 	if status != "" {
 		logger.Print("WARNING: local changes; skipping")
-		return "⏭ локальные изменения", nil
+		return "⏭ local changes", nil
 	}
 	before, err := inspect("rev-parse", "HEAD")
 	if err != nil {
@@ -87,7 +87,7 @@ func update(ctx context.Context, entry item, output io.Writer, logger *log.Logge
 			return "", err
 		}
 		logger.Printf("SUCCESS: %s unchanged; Compose healthy, skipping run", after)
-		return "✅ без новых коммитов, Compose работает, run пропущен", nil
+		return "✅ no new commits, Compose healthy, run skipped", nil
 	}
 	// The trusted config intentionally supplies a shell command.
 	retry := 2
@@ -117,10 +117,10 @@ func update(ctx context.Context, entry item, output io.Writer, logger *log.Logge
 	}
 	logger.Printf("SUCCESS: %s -> %s", before, after)
 	if cloned {
-		return "✅ клонирован, run выполнен", nil
+		return "✅ cloned, run executed", nil
 	}
 	if before != after {
-		return "✅ обновлён, run выполнен", nil
+		return "✅ updated, run executed", nil
 	}
-	return "✅ без новых коммитов, run выполнен", nil
+	return "✅ no new commits, run executed", nil
 }

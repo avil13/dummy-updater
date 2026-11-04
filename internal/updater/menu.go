@@ -111,7 +111,7 @@ func menuText(s string) string {
 func (m *menuUI) choose(title string, choices []string, selected int) (int, error) {
 	for {
 		var frame strings.Builder
-		frame.WriteString("\033[H\033[2J" + menuText(title) + "\n↑/↓ (j/k) — выбор; Enter — открыть; q/Esc — назад\n\n")
+		frame.WriteString("\033[H\033[2J" + menuText(title) + "\n↑/↓ (j/k) — select; Enter — open; q/Esc — back\n\n")
 		start := selected / 12 * 12
 		for i := start; i < min(start+12, len(choices)); i++ {
 			marker := "  "
@@ -179,7 +179,7 @@ func (m *menuUI) view(title, content string) error {
 	start := 0
 	for {
 		var frame strings.Builder
-		fmt.Fprintf(&frame, "\033[H\033[2J%s\n↑/↓ (j/k) — прокрутка; Enter/q/Esc — назад\n\n", menuText(title))
+		fmt.Fprintf(&frame, "\033[H\033[2J%s\n↑/↓ (j/k) — scroll; Enter/q/Esc — back\n\n", menuText(title))
 		for _, line := range lines[start:min(start+16, len(lines))] {
 			frame.WriteString(menuText(line) + "\n")
 		}

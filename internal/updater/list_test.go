@@ -98,8 +98,8 @@ func TestBrowseItems(t *testing.T) {
 			t.Fatalf("unexpected calls: %d", calls)
 		}
 	}
-	m := &menuUI{ctx: context.Background(), input: strings.NewReader("яq\x7f!\r"), output: io.Discard}
-	if got, err := m.ask("value: "); err != nil || got != "я!" {
+	m := &menuUI{ctx: context.Background(), input: strings.NewReader("éq\x7f!\r"), output: io.Discard}
+	if got, err := m.ask("value: "); err != nil || got != "é!" {
 		t.Fatalf("UTF-8 edit: %q, %v", got, err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())

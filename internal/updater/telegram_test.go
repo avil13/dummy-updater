@@ -127,9 +127,9 @@ func TestTelegramSummary(t *testing.T) {
 			t.Fatal("expected POST with previews disabled")
 		}
 		message := r.Form.Get("text")
-		expected := []string{"без новых коммитов, run выполнен", "локальные изменения", "ошибка", "отключён"}
+		expected := []string{"no new commits, run executed", "local changes", "error", "disabled"}
 		if c.TG.OnlyErrors {
-			expected = []string{"failure", "ошибка"}
+			expected = []string{"failure", "error"}
 			for _, name := range []string{"success", "dirty", "disabled"} {
 				if strings.Contains(message, filepath.Join(dir, name)) {
 					t.Errorf("non-error project in report: %s", message)
@@ -140,7 +140,7 @@ func TestTelegramSummary(t *testing.T) {
 		if c.TG.OnlyErrors {
 			wantDisks = 1
 		}
-		if strings.Count(message, "💾 свободно ") != wantDisks || strings.Count(message, " ГБ (") != wantDisks {
+		if strings.Count(message, "💾 free ") != wantDisks || strings.Count(message, " GB (") != wantDisks {
 			t.Errorf("expected disk space for each reported target: %s", message)
 		}
 		for _, status := range expected {

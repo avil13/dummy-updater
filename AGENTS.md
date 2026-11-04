@@ -10,7 +10,7 @@
 - `internal/updater/`: config validation, Git updates, command retries, locking, logging, Telegram notifications, and CLI handling. Tests live beside the implementation.
 - `update.sh`: selects the platform binary and defaults to config beside the script.
 - `config.example.json`: sample configuration; keep real credentials out of the repository.
-- `README.md`: user documentation, written in Russian; preserve its language when editing.
+- `README.md`: user documentation, written in English; preserve its language when editing.
 - `.githooks/pre-commit`: tests and builds the staged source snapshot.
 - `dist/`: binaries for all four supported platform/architecture combinations.
 

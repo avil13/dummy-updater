@@ -65,12 +65,12 @@ func (m *menuUI) logs(path, target string) error {
 		return err
 	}
 	if errorsText == "" {
-		errorsText = "Сохранённых ошибок нет. Вывод успешных запусков не сохраняется."
+		errorsText = "No saved errors. Output from successful runs is not saved."
 	}
-	labels := append([]string{"Ошибки проекта (error.log)"}, files...)
+	labels := append([]string{"Project errors (error.log)"}, files...)
 	selected := 0
 	for {
-		selected, err = m.choose("Логи: "+target, labels, selected)
+		selected, err = m.choose("Logs: "+target, labels, selected)
 		if err != nil || selected < 0 {
 			return err
 		}
