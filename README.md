@@ -11,17 +11,24 @@ Sequentially updates Git repositories and executes the command from the required
 - A Compose file in the root of each target repository.
 - Go 1.27+ only for building and pre-commit; not needed for prebuilt binaries.
 
-Binaries in `dist/` are not tracked in Git. After cloning, download the binary for your
-platform from [GitHub Releases](https://github.com/avil13/dummy-updater/releases)
-into `dist/` and make it executable, for example:
+Binaries in `dist/` are not tracked in Git. After cloning, download the latest stable
+release for your platform:
 
 ```sh
-mkdir -p dist
-# Save the downloaded updater-linux-amd64 file into dist/ first.
-chmod +x dist/updater-linux-amd64
+./_load.sh
 ```
 
-Alternatively, follow [Manual build](#manual-build) before running `update.sh` or a binary.
+The script requires Bash, `curl`, and either `sha256sum` (Linux) or `shasum` (macOS).
+It detects Linux/macOS and amd64/arm64, verifies the release's `SHA256SUMS`, and
+installs only the matching executable into `dist/` beside the script, regardless of
+the current directory. Run it again to check for updates: if the installed file's
+checksum matches the latest release, the binary is not downloaded again.
+Failed downloads or checksum verification leave the existing binary unchanged.
+The script does not run the updater or change configuration files.
+
+Alternatively, download a binary from
+[GitHub Releases](https://github.com/avil13/dummy-updater/releases) manually or
+follow [Manual build](#manual-build) before running `update.sh` or a binary.
 
 ## Configuration
 
@@ -405,7 +412,12 @@ Neither the tests nor the hook run Docker.
 ```sh
 go test ./...
 go vet ./...
+bash -n _load.sh update.sh .githooks/pre-commit
+bash tests/load_test.sh
 ```
+
+The loader tests use fake network responses and platform detection; they do not
+contact GitHub or replace binaries in the repository's `dist/` directory.
 
 Current tests cover JSON reading and validation, executing `run` in the target
 (including retries and failures), interactive project addition, editing and

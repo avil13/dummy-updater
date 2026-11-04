@@ -26,6 +26,8 @@ jobs:
         run: |
           go test ./...
           go vet ./...
+          bash -n _load.sh update.sh .githooks/pre-commit
+          bash tests/load_test.sh
 
       - name: Build binaries
         shell: bash
