@@ -11,6 +11,40 @@ import (
 	"testing"
 )
 
+func TestSelectedRunErrorShowsLogPath(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"git", "docker"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\necho 'fatal: download failed' >&2\nexit 1\n"), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", dir)
+	path := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(path, []byte(`{"items":[{"repo":"repo","target":"project","run":"true"}]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var screen strings.Builder
+	m := &menuUI{ctx: context.Background(), input: strings.NewReader("\rj\r\rqq"), output: &screen}
+	if err := browseItems(m, path, func(target string) error {
+		return runSelected(context.Background(), path, target)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	logs, err := filepath.Glob(filepath.Join(dir, "logs", "project-output-*.log"))
+	if err != nil || len(logs) != 1 {
+		t.Fatalf("logs: %v, %v", logs, err)
+	}
+	for _, want := range []string{"clone: exit status 1", logs[0]} {
+		if !strings.Contains(screen.String(), want) {
+			t.Fatalf("error screen missing %q: %s", want, &screen)
+		}
+	}
+	data, err := os.ReadFile(logs[0])
+	if err != nil || !strings.Contains(string(data), "fatal: download failed") {
+		t.Fatalf("missing diagnostic output: %s, %v", data, err)
+	}
+}
+
 func TestRunLogsOnlyErrors(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"git", "docker"} {

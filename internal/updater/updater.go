@@ -76,6 +76,7 @@ func runSelectedWithConfirmation(ctx context.Context, path, target string, confi
 	statuses := make([]string, len(c.Items))
 	projectErrors := make([]bool, len(c.Items))
 	failed := false
+	var projectFailure error
 	for i, entry := range c.Items {
 		statuses[i] = "⏭ not run"
 		if entry.Enabled != nil && !*entry.Enabled {
@@ -203,6 +204,7 @@ func runSelectedWithConfirmation(ctx context.Context, path, target string, confi
 				logPath = "; output: " + transcript.Name()
 			}
 			errorLogger.Printf("ERROR: %v%s", updateErr, logPath)
+			projectFailure = fmt.Errorf("%s: %w%s", entry.Target, updateErr, logPath)
 			failed = true
 		} else if transcript != nil {
 			if err := os.Remove(transcript.Name()); err != nil {
@@ -212,6 +214,9 @@ func runSelectedWithConfirmation(ctx context.Context, path, target string, confi
 		checkDisk()
 	}
 	if failed {
+		if target != "" {
+			return fmt.Errorf("%w\n\nOpen View logs in the project menu for saved output", projectFailure)
+		}
 		return errors.New("one or more projects failed to update")
 	}
 	return nil
