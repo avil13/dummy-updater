@@ -180,6 +180,10 @@ The project menu provides:
   configuration during input prevent the write.
 - **Run project** — performs the normal Git update and `run` handling for the
   selected target only, with the same retries, locking, logs, and Telegram notifications.
+  If `HEAD` is unchanged after pulling, asks `Execute run again? [Y/n]`:
+  Enter/Y executes `run` even if Compose is healthy; n or Esc skips it.
+  New commits and freshly cloned repositories run without this prompt.
+  This confirmation applies only to **Run project** in `ls`; normal updates are unchanged.
   For a disabled project, first set `enabled: true`.
   During execution, `q`/Esc do not interrupt commands; use Ctrl+C to cancel.
 - **View logs** — shows errors for this target from `error.log` and its saved

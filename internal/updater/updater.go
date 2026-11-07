@@ -17,7 +17,11 @@ func run(ctx context.Context, path string) error {
 }
 
 // An empty target runs all projects; selection is resolved under the config lock.
-func runSelected(ctx context.Context, path, target string) (runErr error) {
+func runSelected(ctx context.Context, path, target string) error {
+	return runSelectedWithConfirmation(ctx, path, target, nil)
+}
+
+func runSelectedWithConfirmation(ctx context.Context, path, target string, confirm func() (bool, error)) (runErr error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -167,7 +171,7 @@ func runSelected(ctx context.Context, path, target string) (runErr error) {
 		} else {
 			logger.Print("Checking project")
 		}
-		status, updateErr := update(ctx, entry, output, logger)
+		status, updateErr := updateWithConfirmation(ctx, entry, output, logger, confirm)
 		if transcript != nil {
 			if closeErr := transcript.Close(); closeErr != nil {
 				updateErr = errors.Join(updateErr, fmt.Errorf("save project output: %w", closeErr))

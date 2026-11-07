@@ -35,6 +35,10 @@ func commandStreams(ctx context.Context, dir string, output, stderr io.Writer, n
 }
 
 func update(ctx context.Context, entry item, output io.Writer, logger *log.Logger) (result string, err error) {
+	return updateWithConfirmation(ctx, entry, output, logger, nil)
+}
+
+func updateWithConfirmation(ctx context.Context, entry item, output io.Writer, logger *log.Logger, confirm func() (bool, error)) (result string, err error) {
 	inspect := func(args ...string) (string, error) {
 		return commandStreams(ctx, entry.Target, nil, output, "git", args...)
 	}
@@ -82,7 +86,17 @@ func update(ctx context.Context, entry item, output io.Writer, logger *log.Logge
 	if err != nil {
 		return "", err
 	}
-	if !cloned && before == after && composeHealthy(ctx, entry.Target, output) {
+	if !cloned && before == after && confirm != nil {
+		approved, err := confirm()
+		if err != nil {
+			return "", err
+		}
+		if !approved {
+			logger.Print("No new commits; run skipped by user")
+			return "⏭ no new commits, run skipped by user", nil
+		}
+	}
+	if !cloned && before == after && confirm == nil && composeHealthy(ctx, entry.Target, output) {
 		if err := ctx.Err(); err != nil {
 			return "", err
 		}

@@ -38,13 +38,38 @@ func listItems(ctx context.Context, path string) (err error) {
 		if err := restore(); err != nil {
 			return err
 		}
-		runErr := runSelected(ctx, path, target)
+		runErr := runSelectedWithConfirmation(ctx, path, target, func() (bool, error) {
+			if err := enter(); err != nil {
+				return false, err
+			}
+			_, _ = fmt.Fprintln(m.output)
+			approved, err := m.confirmRun()
+			return approved, errors.Join(err, restore())
+		})
 		return errors.Join(runErr, enter())
 	})
 	if errors.Is(err, io.EOF) {
 		return nil
 	}
 	return err
+}
+
+func (m *menuUI) confirmRun() (bool, error) {
+	for {
+		answer, err := m.ask("No new Git commits. Execute run again? [Y/n]: ")
+		if errors.Is(err, errEditCanceled) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		switch strings.ToLower(strings.TrimSpace(answer)) {
+		case "", "y", "yes":
+			return true, nil
+		case "n", "no":
+			return false, nil
+		}
+	}
 }
 
 func browseItems(m *menuUI, path string, runProject func(string) error) error {
