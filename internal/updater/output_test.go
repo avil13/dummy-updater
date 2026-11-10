@@ -66,7 +66,7 @@ func TestRunProjectTranscripts(t *testing.T) {
 				t.Fatal(err)
 			}
 			if tc.name == "disabled" {
-				if _, err := os.Stat(filepath.Join(dir, "logs", "error.log")); !os.IsNotExist(err) || len(logs) != 0 {
+				if _, err := os.Stat(filepath.Join(dir, "logs", projectErrorLogName(filepath.Join(dir, "project")))); !os.IsNotExist(err) || len(logs) != 0 {
 					t.Fatalf("disabled logs: files=%v, stat error=%v", logs, err)
 				}
 				data, err := os.ReadFile(console.Name())

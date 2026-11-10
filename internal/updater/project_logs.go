@@ -1,6 +1,7 @@
 package updater
 
 import (
+	"crypto/md5"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -9,6 +10,11 @@ import (
 	"sort"
 	"strings"
 )
+
+// MD5 is only a stable filename identifier, not a security check.
+func projectErrorLogName(target string) string {
+	return fmt.Sprintf("error_%x.log", md5.Sum([]byte(target)))
+}
 
 func projectLogPrefix(target string) string {
 	return fmt.Sprintf("project-output-%x-", sha256.Sum256([]byte(target)))
@@ -31,6 +37,14 @@ func projectLogs(path, target string) (string, []string, error) {
 		if _, name, ok := strings.Cut(line, "; output: "); ok && filepath.Dir(name) == dir {
 			legacy[filepath.Base(name)] = true
 		}
+	}
+	data, err = os.ReadFile(filepath.Join(dir, projectErrorLogName(target)))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", nil, err
+	}
+	// Read the entire per-project file, including truncated and multiline errors.
+	if len(data) > 0 {
+		lines = append(lines, string(data))
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -67,7 +81,7 @@ func (m *menuUI) logs(path, target string) error {
 	if errorsText == "" {
 		errorsText = "No saved errors. Output from successful runs is not saved."
 	}
-	labels := append([]string{"Project errors (error.log)"}, files...)
+	labels := append([]string{"Project errors (" + projectErrorLogName(target) + ")"}, files...)
 	selected := 0
 	for {
 		selected, err = m.choose("Logs: "+target, labels, selected)

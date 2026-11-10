@@ -110,6 +110,12 @@ func TestBrowseItems(t *testing.T) {
 	}
 }
 
+func TestProjectErrorLogName(t *testing.T) {
+	if got := projectErrorLogName("/projects/one"); got != "error_5825f42d5d8e8aefcd49686c973b8315.log" {
+		t.Fatalf("unexpected error log name: %s", got)
+	}
+}
+
 func TestProjectLogs(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")
@@ -133,9 +139,28 @@ func TestProjectLogs(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(logs, "error.log"), []byte(text), 0600); err != nil {
 		t.Fatal(err)
 	}
+	for name, content := range map[string]string{
+		projectErrorLogName(target):            "truncated error tail\nmultiline detail\n",
+		projectErrorLogName(target + "-other"): "unrelated new error",
+	} {
+		if err := os.WriteFile(filepath.Join(logs, name), []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
 	got, files, err := projectLogs(path, target)
 	if err != nil || strings.Contains(got, "unrelated") || !strings.Contains(got, "own") || len(files) != 2 {
 		t.Fatalf("logs: %q, %v, %v", got, files, err)
+	}
+	if !strings.Contains(got, "truncated error tail\nmultiline detail\n") {
+		t.Fatalf("missing full project error: %q", got)
+	}
+	var screen bytes.Buffer
+	m := &menuUI{ctx: context.Background(), input: strings.NewReader("\rqq"), output: &screen}
+	if err := m.logs(path, target); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(screen.String(), projectErrorLogName(target)) || !strings.Contains(screen.String(), "multiline detail") || strings.Contains(screen.String(), "unrelated") {
+		t.Fatalf("project log menu: %s", &screen)
 	}
 	for _, file := range files {
 		if file != own && file != legacy {

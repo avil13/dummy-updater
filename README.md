@@ -188,13 +188,13 @@ The project menu provides:
   file path (when output logging is enabled). Return to **View logs** to read it.
   For a disabled project, first set `enabled: true`.
   During execution, `q`/Esc do not interrupt commands; use Ctrl+C to cancel.
-- **View logs** — shows errors for this target from `error.log` and its saved
+- **View logs** — shows errors from this target's `error_<MD5 of absolute target>.log`, legacy `error.log`, and its saved
   output files (newest first). Enter opens a log, ↑/↓ scrolls, and Enter/`q`/Esc goes back.
   Output from successful runs is still not saved. History may be unavailable
   when logging is disabled or after cleanup.
 
 Output files are now named `project-output-<SHA256 of absolute target>-<random suffix>.log`.
-This allows locating a log even after its beginning or `error.log` has been truncated.
+This allows locating a log even after its beginning or the error log has been truncated.
 Older files without an identifier are shown if this project's error entry still
 contains a reference to them. Symbolic links and directories are not opened as output files.
 Changing a target leaves its previous history associated with the old path.
@@ -216,7 +216,7 @@ of that Compose project without removing containers, networks, or volumes.
 Other projects are unaffected. Enter cancels selection; invalid or interrupted
 input exits without running Docker.
 Git and `run` are not executed, and there are no retries. The same configuration
-lock is used; stop errors are written to `logs/error.log` and stderr.
+lock is used; stop errors are written to `logs/error_<MD5 of absolute target>.log` and stderr.
 The command uses the standard Compose file and current process environment,
 not `-f`/`-p` options from `run`. The JSON format is unchanged.
 The next normal updater invocation will execute `run` again and may start the containers.
@@ -247,12 +247,16 @@ For `docker compose up`, this is not an unconditional restart: Compose may leave
 unchanged containers running.
 
 Logs are stored in a `logs/` directory beside the JSON file (created with `0700` permissions).
-Project update errors are written to `logs/error.log` and stderr, including the
-project path and the cause of the error.
-The size of `error.log` is controlled by `log.max_err_mb` (default: 1 MB): the end
+Project update errors are written to `logs/error_<MD5 of absolute target>.log` and stderr, including the
+project path and the cause of the error. The filename uses the lowercase hexadecimal MD5
+of the normalized absolute `target` path (relative targets resolve against the config directory).
+Each project has its own file with `0600` permissions, shared by updates and `stop`.
+The old shared `logs/error.log` is no longer written, moved, or deleted; `ls` still
+shows its matching project entries alongside the new file.
+The size of each project's error log is controlled by `log.max_err_mb` (default: 1 MB per project): the end
 of the log is kept, with the first line truncated if necessary. The limit applies
 to updates and `stop`; an existing oversized log is truncated when opened.
-`log.max_err_mb: 0` disables the file, but errors still appear on stderr.
+`log.max_err_mb: 0` disables these error files, but errors still appear on stderr.
 Informational messages, warnings, and command output remain in the console.
 In a terminal, the current project's output is refreshed in a 10-line block under
 `Checking project`. A completed block is replaced with a `✅ [target]` or
@@ -270,8 +274,8 @@ sets the maximum size of each `project-output-*.log` file; the default is `0.5` 
 An omitted field or `null` uses the default value.
 When the limit is exceeded, only the end of the output is kept; its beginning may
 be in the middle of a line. On failure, the file is retained and its path is
-included in `error.log` and stderr; on success, the file is deleted. File permissions are `0600`.
-`log.max_project_mb: 0` disables these files, but not `error.log`.
+included in `error_<MD5 of absolute target>.log` and stderr; on success, the file is deleted. File permissions are `0600`.
+`log.max_project_mb: 0` disables these files, but not `error_<MD5 of absolute target>.log`.
 The old `output_log_max_kb` field has been replaced with `log.max_project_mb`.
 Disabling log writes does not disable cleanup according to `log.retention_days`.
 After an abnormal exit, the ring-buffer file may be out of order; after normal
@@ -282,7 +286,7 @@ Command output may contain secrets: review these files before publishing them.
 At the start of updates or `stop`, only regular `logs/project-output-*.log` files
 last modified at least that many days ago are removed.
 `0` disables cleanup. Other files, subdirectories, and symbolic links are untouched;
-`error.log` is limited by size, not age.
+Project error logs are limited by size, not age.
 `log.free_size: "10%"` enables free disk space checks for each `target` before and
 after processing the project. If the target does not yet exist, the disk of its
 nearest existing parent directory is checked.
@@ -368,12 +372,12 @@ no message is sent. Skipped projects, disabled projects, and failed `run` attemp
 followed by a successful retry are not included in this report.
 A startup preparation error (for example, missing Git) after reading the configuration
 and opening the log also triggers a brief notification; details remain on stderr.
-Configuration reading, locking, and log opening errors do not trigger notifications.
+Configuration reading and locking errors do not trigger notifications.
 
 With `only_errors: false` (the default), a brief report is sent after updating for
 each target: cloned, updated, no new commits (with `run` executed or skipped when
 Compose is healthy), error, local changes, disabled, or not run.
-Error details remain in `logs/error.log`.
+Error details remain in `logs/error_<MD5 of absolute target>.log`.
 The report includes free disk space for each target at the time of sending,
 for example: `💾 free 42.50 GB (18.30%)`.
 1 GB = 1,000,000,000 bytes; space available to the current user is used.

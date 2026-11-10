@@ -55,11 +55,12 @@ func runSelectedWithConfirmation(ctx context.Context, path, target string, confi
 		return err
 	}
 	errorLogLimit, outputLogLimit := c.logLimits()
-	file, err := openErrorLog(filepath.Join(logDir, "error.log"), errorLogLimit)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
+	file := &errorLog{}
+	defer func() {
+		if file != nil {
+			_ = file.Close()
+		}
+	}()
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 	green, reset := "", ""
 	terminal := false
@@ -71,7 +72,6 @@ func runSelectedWithConfirmation(ctx context.Context, path, target string, confi
 			}
 		}
 	}
-	errorLogger := log.New(io.MultiWriter(file, os.Stderr), "", log.LstdFlags)
 	tg := resolveTelegram(c.TG)
 	statuses := make([]string, len(c.Items))
 	projectErrors := make([]bool, len(c.Items))
@@ -135,6 +135,11 @@ func runSelectedWithConfirmation(ctx context.Context, path, target string, confi
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		file, err = openErrorLog(filepath.Join(logDir, projectErrorLogName(entry.Target)), errorLogLimit)
+		if err != nil {
+			return err
+		}
+		errorLogger := log.New(io.MultiWriter(file, os.Stderr), "["+entry.Target+"] ", log.LstdFlags)
 		diskWarningSent := false
 		checkDisk := func() {
 			if c.Log != nil && c.Log.FreeSize != nil && !diskWarningSent {
@@ -194,11 +199,10 @@ func runSelectedWithConfirmation(ctx context.Context, path, target string, confi
 		}
 		if updateErr != nil {
 			projectErrors[i] = true
-			statuses[i] = "❌ error (see logs/error.log for details)"
+			statuses[i] = "❌ error (see logs/" + projectErrorLogName(entry.Target) + " for details)"
 			if errorLogLimit == 0 {
 				statuses[i] = "❌ error (see stderr for details)"
 			}
-			errorLogger.SetPrefix("[" + entry.Target + "] ")
 			logPath := ""
 			if transcript != nil {
 				logPath = "; output: " + transcript.Name()
@@ -211,6 +215,10 @@ func runSelectedWithConfirmation(ctx context.Context, path, target string, confi
 				return fmt.Errorf("remove successful project output log: %w", err)
 			}
 		}
+		if err := file.Close(); err != nil {
+			return err
+		}
+		file = &errorLog{}
 		checkDisk()
 	}
 	if failed {

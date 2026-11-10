@@ -92,7 +92,7 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 		!strings.Contains(string(output), "Checking project\n") || strings.Contains(string(output), "\033[") {
 		t.Fatalf("expected separated project heading without colors in redirected output, got %q", output)
 	}
-	data, err := os.ReadFile(filepath.Join(dir, "logs", "error.log"))
+	data, err := os.ReadFile(filepath.Join(dir, "logs", projectErrorLogName(filepath.Join(dir, "project"))))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,6 +117,70 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 	}
 	if string(consoleData) != string(data) || !strings.Contains(string(consoleData), "["+filepath.Join(dir, "project")+"]") {
 		t.Fatalf("expected the same error with project path in stderr, got %q", consoleData)
+	}
+}
+
+func TestRunProjectErrorLogOpenFailure(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"git", "docker"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\nexit 99\n"), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", dir)
+	t.Setenv("TELEGRAM_ENABLED", "false")
+	path := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(path, []byte(`{"items":[{"repo":"repo","target":"project","run":"true"}]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	logPath := filepath.Join(dir, "logs", projectErrorLogName(filepath.Join(dir, "project")))
+	if err := os.MkdirAll(logPath, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := run(context.Background(), path); err == nil || !strings.Contains(err.Error(), logPath) {
+		t.Fatalf("expected log opening error, got %v", err)
+	}
+}
+
+func TestRunSeparateProjectErrors(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"git", "docker"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\nexit 1\n"), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", dir)
+	t.Setenv("TELEGRAM_ENABLED", "false")
+	path := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(path, []byte(`{"log":{"max_err_mb":0.001},"items":[{"repo":"one","target":"one","run":"true"},{"repo":"two","target":"./two","run":"true"}]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := run(context.Background(), path); err == nil {
+			t.Fatal("expected project failures")
+		}
+	}
+	for _, name := range []string{"one", "two"} {
+		target := filepath.Join(dir, name)
+		logPath := filepath.Join(dir, "logs", projectErrorLogName(target))
+		data, err := os.ReadFile(logPath)
+		if err != nil || !strings.Contains(string(data), "ERROR: clone:") || len(data) > 1000 {
+			t.Fatalf("project error log: %q, %v", data, err)
+		}
+		other := "one"
+		if name == other {
+			other = "two"
+		}
+		if strings.Contains(string(data), "["+filepath.Join(dir, other)+"]") {
+			t.Fatalf("mixed project errors: %q", data)
+		}
+		info, err := os.Stat(logPath)
+		if err != nil || info.Mode().Perm() != 0600 {
+			t.Fatalf("log permissions: %v, %v", info, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "logs", "error.log")); !os.IsNotExist(err) {
+		t.Fatalf("shared error log created: %v", err)
 	}
 }
 

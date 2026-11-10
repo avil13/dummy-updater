@@ -28,7 +28,7 @@ func TestLogRetention(t *testing.T) {
 				if err := os.Mkdir(dir, 0700); err != nil {
 					t.Fatal(err)
 				}
-				for _, name := range []string{"project-output-old.log", "project-output-recent.log", "error.log", "other.log"} {
+				for _, name := range []string{"project-output-old.log", "project-output-recent.log", "error.log", projectErrorLogName("/projects/one"), "other.log"} {
 					file := filepath.Join(dir, name)
 					if err := os.WriteFile(file, []byte("old output"), 0600); err != nil {
 						t.Fatal(err)
@@ -70,7 +70,7 @@ func TestLogRetention(t *testing.T) {
 				if _, err := os.Stat(filepath.Join(dir, "project-output-old.log")); os.IsNotExist(err) != tc.remove {
 					t.Fatalf("unexpected retention result: %v", err)
 				}
-				for _, name := range []string{"project-output-recent.log", "error.log", "other.log", "project-output-directory.log", "project-output-link.log"} {
+				for _, name := range []string{"project-output-recent.log", "error.log", projectErrorLogName("/projects/one"), "other.log", "project-output-directory.log", "project-output-link.log"} {
 					if _, err := os.Lstat(filepath.Join(dir, name)); err != nil {
 						t.Fatalf("removed %s: %v", name, err)
 					}

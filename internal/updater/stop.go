@@ -72,7 +72,7 @@ func stopItem(ctx context.Context, path string, input io.Reader, output io.Write
 	}
 	entry := items[n-1]
 	errorLogLimit, _ := c.logLimits()
-	file, err := openErrorLog(filepath.Join(logDir, "error.log"), errorLogLimit)
+	file, err := openErrorLog(filepath.Join(logDir, projectErrorLogName(entry.Target)), errorLogLimit)
 	if err != nil {
 		return err
 	}
