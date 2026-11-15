@@ -24,13 +24,11 @@ func TestRunProjectTranscripts(t *testing.T) {
 			if err := os.MkdirAll(filepath.Join(dir, "project", ".git"), 0700); err != nil {
 				t.Fatal(err)
 			}
-			git := "#!/bin/sh\ncase \"$1\" in\nremote) echo " + strings.Repeat("x", 2000) + " >&2; echo inspection-stderr >&2; "
+			git := "#!/bin/sh\ncase \"$1\" in\nstatus) echo " + strings.Repeat("x", 2000) + " >&2; echo inspection-stderr >&2; "
 			if fail {
 				git += "exit 1"
-			} else {
-				git += "echo repo"
 			}
-			git += ";;\nrev-parse) echo commit;;\nesac\n"
+			git += ";;\nrev-parse) echo commit;;\npull) exit 0;;\nesac\n"
 			for name, script := range map[string]string{"git": git, "docker": "#!/bin/sh\nexit 0\n"} {
 				if err := os.WriteFile(filepath.Join(dir, name), []byte(script), 0700); err != nil {
 					t.Fatal(err)

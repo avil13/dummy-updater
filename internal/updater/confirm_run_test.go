@@ -44,17 +44,14 @@ func TestRunSelectedConfirmation(t *testing.T) {
 		{"unchanged yes", true, true, true},
 		{"unchanged no", false, true, false},
 		{"changed", false, false, true},
-		{"clone", false, false, true},
 		{"dirty", true, false, false},
 		{"pull failure", true, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			target := filepath.Join(dir, "project")
-			if tc.name != "clone" {
-				if err := os.MkdirAll(filepath.Join(target, ".git"), 0700); err != nil {
-					t.Fatal(err)
-				}
+			if err := os.MkdirAll(filepath.Join(target, ".git"), 0700); err != nil {
+				t.Fatal(err)
 			}
 			path := filepath.Join(dir, "config.json")
 			if err := os.WriteFile(path, []byte(`{"items":[{"repo":"repo","target":"project","run":"echo ran > ran","retry":0}]}`), 0600); err != nil {
@@ -63,7 +60,6 @@ func TestRunSelectedConfirmation(t *testing.T) {
 			for name, script := range map[string]string{
 				"git": `#!/bin/sh
 case "$1" in
-clone) mkdir -p "$4/.git";;
 remote) echo repo;;
 status) if [ "$SCENARIO" = dirty ]; then echo modified; fi;;
 rev-parse) if [ "$SCENARIO" = changed ] && [ -f .git/pulled ]; then echo after; else echo before; fi;;

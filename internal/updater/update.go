@@ -3,13 +3,11 @@ package updater
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -43,28 +41,6 @@ func updateWithConfirmation(ctx context.Context, entry item, output io.Writer, l
 		return commandStreams(ctx, entry.Target, nil, output, "git", args...)
 	}
 	cloned := false
-	if _, err := os.Stat(entry.Target); errors.Is(err, os.ErrNotExist) {
-		if err := os.MkdirAll(filepath.Dir(entry.Target), 0755); err != nil {
-			return "", err
-		}
-		if _, err := command(ctx, "", output, "git", "clone", "--", entry.Repo, entry.Target); err != nil {
-			return "", fmt.Errorf("clone: %w", err)
-		}
-		cloned = true
-	} else if err != nil {
-		return "", err
-	}
-	// Require the target itself to be a repository, not a directory inside one.
-	if _, err := os.Stat(filepath.Join(entry.Target, ".git")); err != nil {
-		return "", fmt.Errorf("target is not a Git repository: %w", err)
-	}
-	remote, err := inspect("remote", "get-url", "origin")
-	if err != nil {
-		return "", err
-	}
-	if remote != entry.Repo {
-		return "", errors.New("origin does not match configured repo")
-	}
 	status, err := inspect("status", "--porcelain")
 	if err != nil {
 		return "", err
@@ -77,10 +53,8 @@ func updateWithConfirmation(ctx context.Context, entry item, output io.Writer, l
 	if err != nil {
 		return "", err
 	}
-	if !cloned {
-		if _, err := command(ctx, entry.Target, output, "git", "pull", "--ff-only"); err != nil {
-			return "", fmt.Errorf("pull: %w", err)
-		}
+	if _, err := command(ctx, entry.Target, output, "git", "pull", "--ff-only"); err != nil {
+		return "", fmt.Errorf("pull: %w", err)
 	}
 	after, err := inspect("rev-parse", "HEAD")
 	if err != nil {

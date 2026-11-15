@@ -14,13 +14,12 @@ import (
 func TestUpdateComposeSkip(t *testing.T) {
 	const healthy = `{"Service":"web","State":"running","Health":"healthy"}`
 	for _, tc := range []struct {
-		name, services, status         string
-		changed, cloned, failure, skip bool
+		name, services, status string
+		changed, failure, skip bool
 	}{
 		{name: "healthy array", services: "web", status: "[" + healthy + "]", skip: true},
 		{name: "healthy stream", services: "web\ndb", status: healthy + "\n" + `{"Service":"db","State":"running","Health":""}`, skip: true},
 		{name: "new commits", services: "web", status: healthy, changed: true},
-		{name: "clone", services: "web", status: healthy, cloned: true},
 		{name: "missing service", services: "web\ndb", status: healthy},
 		{name: "stopped replica", services: "web", status: healthy + "\n" + `{"Service":"web","State":"exited"}`},
 		{name: "unhealthy", services: "web", status: `{"Service":"web","State":"running","Health":"unhealthy"}`},
@@ -34,10 +33,8 @@ func TestUpdateComposeSkip(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			target := filepath.Join(dir, "project")
-			if !tc.cloned {
-				if err := os.MkdirAll(filepath.Join(target, ".git"), 0700); err != nil {
-					t.Fatal(err)
-				}
+			if err := os.MkdirAll(filepath.Join(target, ".git"), 0700); err != nil {
+				t.Fatal(err)
 			}
 			t.Setenv("CHANGED", fmt.Sprint(tc.changed))
 			t.Setenv("SERVICES", tc.services)
@@ -46,7 +43,6 @@ func TestUpdateComposeSkip(t *testing.T) {
 			scripts := map[string]string{
 				"git": `#!/bin/sh
 case "$1" in
-clone) mkdir -p "$4/.git";;
 remote) echo repo;;
 rev-parse) if [ "$CHANGED" = true ] && [ -f .git/pulled ]; then echo after; else echo before; fi;;
 pull) echo pulled > .git/pulled;;
@@ -76,10 +72,8 @@ esac
 			if tc.skip != os.IsNotExist(err) || tc.skip != strings.Contains(result, "run skipped") {
 				t.Fatalf("skip=%v, stat=%v, result=%s", tc.skip, err, result)
 			}
-			if !tc.cloned {
-				if _, err := os.Stat(filepath.Join(target, ".git", "pulled")); err != nil {
-					t.Fatal("pull was not executed:", err)
-				}
+			if _, err := os.Stat(filepath.Join(target, ".git", "pulled")); err != nil {
+				t.Fatal("pull was not executed:", err)
 			}
 			if tc.skip {
 				calls, err := os.ReadFile(filepath.Join(target, "docker-calls"))

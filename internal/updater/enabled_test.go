@@ -45,8 +45,18 @@ func TestDisabledItemsSkipped(t *testing.T) {
 			t.Setenv("CALLS", calls)
 			// No executables are installed for the all-disabled case.
 			if !allDisabled {
+				if err := os.MkdirAll(filepath.Join(dir, "active", ".git"), 0700); err != nil {
+					t.Fatal(err)
+				}
 				for name, script := range map[string]string{
-					"git":    "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$CALLS\"\nexit 1\n",
+					"git": `#!/bin/sh
+printf '%s\n' "$*" >> "$CALLS"
+case "$1" in
+status) exit 0;;
+rev-parse) echo commit;;
+pull) exit 0;;
+esac
+`,
 					"docker": "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$CALLS\"\n",
 				} {
 					if err := os.WriteFile(filepath.Join(dir, name), []byte(script), 0700); err != nil {
@@ -57,11 +67,6 @@ func TestDisabledItemsSkipped(t *testing.T) {
 			err := run(context.Background(), path)
 			if (err == nil) != allDisabled {
 				t.Fatalf("run: %v", err)
-			}
-			if !allDisabled {
-				if err := os.Mkdir(filepath.Join(dir, "active"), 0700); err != nil {
-					t.Fatal(err)
-				}
 			}
 			var output strings.Builder
 			if err := stopItem(context.Background(), path, strings.NewReader("1\n"), &output); err != nil {
@@ -76,8 +81,8 @@ func TestDisabledItemsSkipped(t *testing.T) {
 					t.Fatalf("unexpected calls: %s, %v", got, err)
 				}
 			} else {
-				want := "clone -- active " + filepath.Join(dir, "active") + "\ncompose stop\n"
-				if err != nil || string(got) != want {
+				callsText := string(got)
+				if err != nil || !strings.Contains(callsText, "pull --ff-only") || !strings.Contains(callsText, "compose stop") || strings.Contains(callsText, "disabled") {
 					t.Fatalf("calls: %q, %v", got, err)
 				}
 			}

@@ -13,6 +13,10 @@ import (
 
 func TestSelectedRunErrorShowsLogPath(t *testing.T) {
 	dir := t.TempDir()
+	target := filepath.Join(dir, "project")
+	if err := os.MkdirAll(filepath.Join(target, ".git"), 0700); err != nil {
+		t.Fatal(err)
+	}
 	for _, name := range []string{"git", "docker"} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\necho 'fatal: download failed' >&2\nexit 1\n"), 0700); err != nil {
 			t.Fatal(err)
@@ -34,7 +38,7 @@ func TestSelectedRunErrorShowsLogPath(t *testing.T) {
 	if err != nil || len(logs) != 1 {
 		t.Fatalf("logs: %v, %v", logs, err)
 	}
-	for _, want := range []string{"clone: exit status 1", logs[0]} {
+	for _, want := range []string{"exit status 1", logs[0]} {
 		if !strings.Contains(screen.String(), want) {
 			t.Fatalf("error screen missing %q: %s", want, &screen)
 		}
@@ -47,8 +51,16 @@ func TestSelectedRunErrorShowsLogPath(t *testing.T) {
 
 func TestRunLogsOnlyErrors(t *testing.T) {
 	dir := t.TempDir()
+	target := filepath.Join(dir, "project")
+	if err := os.MkdirAll(filepath.Join(target, ".git"), 0700); err != nil {
+		t.Fatal(err)
+	}
 	for _, name := range []string{"git", "docker"} {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\necho command-output\nexit 1\n"), 0700); err != nil {
+		script := "#!/bin/sh\necho command-output >&2\nexit 1\n"
+		if name == "docker" {
+			script = "#!/bin/sh\nexit 1\n"
+		}
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(script), 0700); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -82,7 +94,7 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 		}
 	})
 	if err := run(context.Background(), path); err == nil {
-		t.Fatal("expected clone failure")
+		t.Fatal("expected failure")
 	}
 	output, err := os.ReadFile(stdout.Name())
 	if err != nil {
@@ -97,8 +109,8 @@ func TestRunLogsOnlyErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(lines) != 1 || !strings.Contains(lines[0], "ERROR: clone:") {
-		t.Fatalf("expected only the clone error in log, got %q", data)
+	if len(lines) != 1 || !strings.Contains(lines[0], "ERROR:") || !strings.Contains(lines[0], "exit status 1") {
+		t.Fatalf("expected only the git error in log, got %q", data)
 	}
 	logs, err := filepath.Glob(filepath.Join(dir, "logs", "project-output-*.log"))
 	if err != nil || len(logs) != 1 {
@@ -144,6 +156,11 @@ func TestRunProjectErrorLogOpenFailure(t *testing.T) {
 
 func TestRunSeparateProjectErrors(t *testing.T) {
 	dir := t.TempDir()
+	for _, name := range []string{"one", "two"} {
+		if err := os.MkdirAll(filepath.Join(dir, name, ".git"), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
 	for _, name := range []string{"git", "docker"} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\nexit 1\n"), 0700); err != nil {
 			t.Fatal(err)
@@ -164,7 +181,7 @@ func TestRunSeparateProjectErrors(t *testing.T) {
 		target := filepath.Join(dir, name)
 		logPath := filepath.Join(dir, "logs", projectErrorLogName(target))
 		data, err := os.ReadFile(logPath)
-		if err != nil || !strings.Contains(string(data), "ERROR: clone:") || len(data) > 1000 {
+		if err != nil || !strings.Contains(string(data), "ERROR:") || !strings.Contains(string(data), "exit status 1") || len(data) > 1000 {
 			t.Fatalf("project error log: %q, %v", data, err)
 		}
 		other := "one"
